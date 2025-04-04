@@ -3,15 +3,15 @@ require("dotenv").config();
 
 // 引入所需模組
 const express = require("express");
-const { getWalletBalances } = require("./utils/oneinch"); // 修正路徑
+const { getWalletBalances } = require("./utils/oneinch");
 const cors = require('cors');
 
 // 初始化 Express 應用
 const app = express();
-const PORT = process.env.PORT || 3010;
+const PORT = process.env.PORT;
 
 // 添加 CORS 中間件
-app.use(cors());  // 允許所有來源的請求
+app.use(cors()); // 允許所有來源的請求
 
 // 中間件：解析 JSON 請求主體
 app.use(express.json());
@@ -29,12 +29,13 @@ app.get("/", (req, res) => {
 app.get("/wallet/balances/:chainId/:walletAddress", async (req, res) => {
   try {
     const { chainId, walletAddress } = req.params;
+    console.log(`前端請求：查詢 chainId=${chainId}, walletAddress=${walletAddress}`); // 添加日誌
     // 調用 getWalletBalances 函數
     const result = await getWalletBalances(chainId, walletAddress);
-
     // 返回結果
     res.status(200).json(result);
   } catch (error) {
+    console.error("前端請求失敗:", error.message); // 添加錯誤日誌
     res.status(500).json({ error: "無法獲取錢包餘額", details: error.message });
   }
 });
