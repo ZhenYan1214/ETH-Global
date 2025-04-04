@@ -21,40 +21,9 @@
             <v-icon left>mdi-swap-horizontal</v-icon>
             Swap
           </span>
-          <v-spacer></v-spacer>
-          <v-btn icon @click="checkWalletTokens" :loading="isLoading">
-            <v-icon>mdi-wallet</v-icon>
-          </v-btn>
         </v-card-title>
 
         <v-card-text class="pa-6">
-          <!-- 代幣列表 -->
-          <div v-if="tokens.length > 0" class="tokens-list mb-6">
-            <v-list class="token-list-bg">
-              <v-list-item
-                v-for="token in tokens"
-                :key="token.symbol"
-                class="token-item"
-              >
-                <div class="d-flex align-center justify-space-between w-100">
-                  <div class="d-flex align-center">
-                    <v-avatar size="32" class="mr-3">
-                      <v-img :src="token.logoURI" :alt="token.symbol"></v-img>
-                    </v-avatar>
-                    <div>
-                      <div class="token-symbol">{{ token.symbol }}</div>
-                      <div class="token-name">{{ token.name }}</div>
-                    </div>
-                  </div>
-                  <div class="text-right">
-                    <div class="token-balance">{{ token.balance }}</div>
-                    <div class="token-value">${{ token.value }}</div>
-                  </div>
-                </div>
-              </v-list-item>
-            </v-list>
-          </div>
-
           <!-- Swap 表單 -->
           <div class="swap-form">
             <!-- From Token -->
@@ -65,18 +34,21 @@
                 variant="outlined"
                 class="mb-4"
                 hide-details
-                :readonly="true"
               >
-                <template v-slot:prepend-inner>
+                <template v-slot:append>
                   <v-btn
                     class="token-select-btn"
                     @click="showFromTokenList = true"
+                    rounded="pill"
+                    variant="tonal"
                   >
-                    <v-avatar size="24" class="mr-2" v-if="selectedFromToken">
-                      <v-img :src="selectedFromToken.logoURI" :alt="selectedFromToken.symbol"></v-img>
-                    </v-avatar>
-                    {{ selectedFromToken ? selectedFromToken.symbol : 'Select Token' }}
-                    <v-icon right>mdi-chevron-down</v-icon>
+                    <template v-if="selectedFromToken">
+                      {{ selectedFromToken.address.substring(0, 8) }}...
+                    </template>
+                    <template v-else>
+                      Select Token
+                    </template>
+                    <v-icon right class="ml-2">mdi-chevron-down</v-icon>
                   </v-btn>
                 </template>
               </v-text-field>
@@ -97,18 +69,21 @@
                 variant="outlined"
                 class="mb-4"
                 hide-details
-                :readonly="true"
               >
-                <template v-slot:prepend-inner>
+                <template v-slot:append>
                   <v-btn
                     class="token-select-btn"
                     @click="showToTokenList = true"
+                    rounded="pill"
+                    variant="tonal"
                   >
-                    <v-avatar size="24" class="mr-2" v-if="selectedToToken">
-                      <v-img :src="selectedToToken.logoURI" :alt="selectedToToken.symbol"></v-img>
-                    </v-avatar>
-                    {{ selectedToToken ? selectedToToken.symbol : 'Select Token' }}
-                    <v-icon right>mdi-chevron-down</v-icon>
+                    <template v-if="selectedToToken">
+                      {{ selectedToToken.address.substring(0, 8) }}...
+                    </template>
+                    <template v-else>
+                      Select Token
+                    </template>
+                    <v-icon right class="ml-2">mdi-chevron-down</v-icon>
                   </v-btn>
                 </template>
               </v-text-field>
@@ -130,7 +105,7 @@
     </div>
 
     <!-- From Token 選擇對話框 -->
-    <v-dialog v-model="showFromTokenList" max-width="500">
+    <v-dialog v-model="showFromTokenList" max-width="400">
       <v-card class="token-dialog">
         <v-card-title class="dialog-title">
           <span>選擇代幣</span>
@@ -140,37 +115,29 @@
           </v-btn>
         </v-card-title>
         <v-card-text class="pa-4">
-          <v-list class="token-list" select-strategy="single-select">
+          <v-list v-if="tokens.length > 0">
             <v-list-item
               v-for="token in tokens"
               :key="token.address"
-              :value="token"
               @click="selectFromToken(token)"
-              :class="{ 'selected-token': selectedFromToken?.address === token.address }"
+              class="token-list-item"
+              :class="{ 'selected': selectedFromToken?.address === token.address }"
             >
-              <template v-slot:prepend>
-                <v-checkbox-btn
-                  :model-value="selectedFromToken?.address === token.address"
-                  color="pink"
-                ></v-checkbox-btn>
-                <v-avatar size="32" class="mr-3">
-                  <v-img :src="token.logoURI" :alt="token.symbol"></v-img>
-                </v-avatar>
-              </template>
-              <v-list-item-title class="token-name">{{ token.symbol }}</v-list-item-title>
-              <template v-slot:append>
-                <div class="text-right">
-                  <div class="token-balance">{{ token.balance }}</div>
-                </div>
-              </template>
+              <div class="d-flex justify-space-between align-center w-100">
+                <span class="token-address">{{ token.address.substring(0, 8) }}...</span>
+                <span class="token-balance">{{ token.balance }}</span>
+              </div>
             </v-list-item>
           </v-list>
+          <div v-else class="text-center pa-4">
+            Loading tokens...
+          </div>
         </v-card-text>
       </v-card>
     </v-dialog>
 
     <!-- To Token 選擇對話框 -->
-    <v-dialog v-model="showToTokenList" max-width="500">
+    <v-dialog v-model="showToTokenList" max-width="400">
       <v-card class="token-dialog">
         <v-card-title class="dialog-title">
           <span>選擇代幣</span>
@@ -180,31 +147,23 @@
           </v-btn>
         </v-card-title>
         <v-card-text class="pa-4">
-          <v-list class="token-list" select-strategy="single-select">
+          <v-list v-if="tokens.length > 0">
             <v-list-item
               v-for="token in tokens"
               :key="token.address"
-              :value="token"
               @click="selectToToken(token)"
-              :class="{ 'selected-token': selectedToToken?.address === token.address }"
+              class="token-list-item"
+              :class="{ 'selected': selectedToToken?.address === token.address }"
             >
-              <template v-slot:prepend>
-                <v-checkbox-btn
-                  :model-value="selectedToToken?.address === token.address"
-                  color="pink"
-                ></v-checkbox-btn>
-                <v-avatar size="32" class="mr-3">
-                  <v-img :src="token.logoURI" :alt="token.symbol"></v-img>
-                </v-avatar>
-              </template>
-              <v-list-item-title class="token-name">{{ token.symbol }}</v-list-item-title>
-              <template v-slot:append>
-                <div class="text-right">
-                  <div class="token-balance">{{ token.balance }}</div>
-                </div>
-              </template>
+              <div class="d-flex justify-space-between align-center w-100">
+                <span class="token-address">{{ token.address.substring(0, 8) }}...</span>
+                <span class="token-balance">{{ token.balance }}</span>
+              </div>
             </v-list-item>
           </v-list>
+          <div v-else class="text-center pa-4">
+            Loading tokens...
+          </div>
         </v-card-text>
       </v-card>
     </v-dialog>
@@ -212,7 +171,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import axios from 'axios'
 
 const isLoading = ref(false)
@@ -228,18 +187,67 @@ const DEFAULT_WALLET_ADDRESS = "0x4EC7a00D26d392e1B29e6b7fA0199D5849A1459d"
 
 async function checkWalletTokens() {
   isLoading.value = true
+  tokens.value = [] // 清空現有代幣列表
+  
   try {
-    const response = await axios.get(`https://api.1inch.io/v5.0/1/address/${DEFAULT_WALLET_ADDRESS}/tokens`)
-    if (response.data && response.data.tokens) {
-      tokens.value = Object.values(response.data.tokens)
-        .filter(token => parseFloat(token.balance) > 0)
-        .map(token => ({
-          ...token,
-          balance: (parseFloat(token.balance) / Math.pow(10, token.decimals)).toFixed(4),
-        }))
+    console.log('開始獲取代幣列表...')
+    console.log('API URL:', `http://localhost:3010/wallet/balances/137/${DEFAULT_WALLET_ADDRESS}`)
+    
+    const response = await axios.get(`http://localhost:3010/wallet/balances/137/${DEFAULT_WALLET_ADDRESS}`)
+    console.log('完整的 API 響應:', response)
+    console.log('API 響應數據:', response.data)
+    
+    if (!response.data) {
+      console.error('API 響應為空')
+      return
+    }
+
+    if (!response.data.balances) {
+      console.error('API 響應中沒有 balances 字段:', response.data)
+      return
+    }
+
+    if (!Array.isArray(response.data.balances)) {
+      console.error('balances 不是數組:', response.data.balances)
+      return
+    }
+
+    const filteredTokens = response.data.balances.filter(token => {
+      if (!token.token || !token.balance) {
+        console.log('跳過無效的代幣數據:', token)
+        return false
+      }
+      const balance = parseFloat(token.balance)
+      console.log(`代幣 ${token.token} 的餘額:`, balance)
+      return balance > 0
+    })
+
+    console.log('過濾後的代幣:', filteredTokens)
+
+    tokens.value = filteredTokens.map(token => {
+      const processed = {
+        address: token.token,
+        balance: parseFloat(token.balance).toFixed(4)
+      }
+      console.log('處理後的代幣數據:', processed)
+      return processed
+    })
+
+    console.log('最終的代幣列表:', tokens.value)
+    
+    if (tokens.value.length === 0) {
+      console.log('沒有找到任何代幣')
     }
   } catch (error) {
-    console.error('Error fetching tokens:', error)
+    console.error('獲取代幣時出錯:', error)
+    if (error.response) {
+      console.error('錯誤響應:', error.response.data)
+      console.error('錯誤狀態:', error.response.status)
+    } else if (error.request) {
+      console.error('沒有收到響應:', error.request)
+    } else {
+      console.error('請求配置錯誤:', error.message)
+    }
   } finally {
     isLoading.value = false
   }
@@ -261,8 +269,9 @@ function swapTokens() {
   selectedToToken.value = temp
 }
 
-// 初始化時自動獲取代幣列表
-checkWalletTokens()
+onMounted(() => {
+  checkWalletTokens()
+})
 </script>
 
 <style scoped>
@@ -273,19 +282,6 @@ checkWalletTokens()
 
 .nav-bar {
   background: linear-gradient(45deg, #FF9999, #FFB6C1) !important;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
-}
-
-.nav-btn {
-  color: white !important;
-  font-weight: 500 !important;
-  letter-spacing: 0.5px;
-  margin: 0 0.5rem !important;
-  transition: all 0.3s ease;
-}
-
-.nav-btn:hover {
-  transform: translateY(-2px);
 }
 
 .content-container {
@@ -300,8 +296,6 @@ checkWalletTokens()
   width: 100%;
   max-width: 480px;
   border-radius: 20px !important;
-  overflow: hidden;
-  box-shadow: 0 8px 32px rgba(255, 153, 153, 0.1);
 }
 
 .card-title {
@@ -310,23 +304,13 @@ checkWalletTokens()
   padding: 1rem 1.5rem !important;
 }
 
-.token-input-container {
-  position: relative;
-}
-
 .token-select-btn {
-  background: transparent !important;
+  background: rgba(255, 182, 193, 0.1) !important;
   color: #333 !important;
   font-weight: 500 !important;
   text-transform: none !important;
-  letter-spacing: 0.5px !important;
-  padding: 0 8px !important;
-  min-width: 120px !important;
-  justify-content: flex-start !important;
-}
-
-.swap-form {
-  position: relative;
+  padding: 0 16px !important;
+  height: 40px !important;
 }
 
 .swap-arrow {
@@ -337,78 +321,48 @@ checkWalletTokens()
   z-index: 1;
 }
 
-.swap-arrow-btn {
-  background: white !important;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
-  width: 40px !important;
-  height: 40px !important;
-}
-
-.swap-arrow-btn:hover {
-  transform: scale(1.1);
-}
-
 .swap-btn {
   background: linear-gradient(45deg, #FF9999, #FFB6C1) !important;
   color: white !important;
   font-size: 1.1rem !important;
   text-transform: none !important;
-  letter-spacing: 0.5px !important;
   border-radius: 12px !important;
 }
 
 .token-dialog {
-  border-radius: 20px !important;
-  overflow: hidden;
+  border-radius: 12px !important;
 }
 
 .dialog-title {
   background: linear-gradient(45deg, #FF9999, #FFB6C1) !important;
   color: white !important;
-  padding: 1rem 1.5rem !important;
 }
 
 .close-btn {
   color: white !important;
 }
 
-.token-list {
-  max-height: 400px;
-  overflow-y: auto;
-  background: transparent !important;
+.token-list-item {
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
 }
 
-.token-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.token-list::-webkit-scrollbar-track {
-  background: rgba(255, 182, 193, 0.1);
-  border-radius: 3px;
-}
-
-.token-list::-webkit-scrollbar-thumb {
-  background: rgba(255, 182, 193, 0.5);
-  border-radius: 3px;
-}
-
-.token-list::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 182, 193, 0.7);
-}
-
-.selected-token {
+.token-list-item:hover {
   background-color: rgba(255, 182, 193, 0.1) !important;
 }
 
-.token-name {
-  font-weight: 600;
-  color: #333;
-  margin-left: 8px;
+.token-list-item.selected {
+  background-color: rgba(255, 182, 193, 0.2) !important;
+}
+
+.token-address {
+  font-family: monospace;
+  font-size: 14px;
 }
 
 .token-balance {
-  font-weight: 600;
   color: #FF6B88;
-  text-align: right;
+  font-weight: 500;
 }
 </style> 
