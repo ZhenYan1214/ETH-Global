@@ -94,20 +94,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-
-// Try to import the wallet store - this might fail if there are errors
-let walletStore = null
-let errorMessage = ref(null)
-
-try {
-  const { useWalletStore } = await import('../store/wallet')
-  walletStore = useWalletStore()
-} catch (error) {
-  console.error('Failed to load wallet store:', error)
-  errorMessage.value = `Failed to load wallet: ${error.message}`
-}
+import { useWalletStore } from '../store/wallet'
 
 const router = useRouter()
 const showLoginDialog = ref(false)
@@ -115,8 +104,18 @@ const username = ref('')
 const isRegistering = ref(false)
 const isLoading = ref(false)
 const walletError = ref('')
+const errorMessage = ref(null)
 
-// If the wallet store is available, we can use it
+// Try to use the wallet store
+let walletStore = null
+try {
+  walletStore = useWalletStore()
+} catch (error) {
+  console.error('Failed to initialize wallet store:', error)
+  errorMessage.value = `Wallet initialization error: ${error.message}`
+}
+
+// Connect wallet function
 const connectWallet = async () => {
   if (!walletStore) {
     walletError.value = 'Wallet module could not be loaded'

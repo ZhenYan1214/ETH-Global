@@ -9,31 +9,13 @@ import {
 } from '@circle-fin/modular-wallets-core'
 import {
   createPublicClient,
-  createBundlerClient as createClientFromCore,
-  toWebAuthnAccount
 } from 'viem'
+import {
+  createBundlerClient,
+  toWebAuthnAccount,
+} from 'viem/account-abstraction'
 import { polygon } from 'viem/chains'
 
-// Simple fallback/simulation implementation for development
-const createBundlerClient = (args) => {
-  // Check if the real implementation is available
-  if (typeof createClientFromCore === 'function') {
-    return createClientFromCore(args)
-  }
-
-  // Fallback implementation for development
-  console.warn('Using fallback bundler client')
-  return {
-    async sendUserOperation({ account, calls }) {
-      console.log('Simulating transaction with account', account?.address, 'and calls', calls)
-      return 'tx-' + Math.random().toString(36).substring(2, 15)
-    },
-    async waitForUserOperationReceipt({ hash }) {
-      console.log('Simulating receipt for hash', hash)
-      return { receipt: { blockNumber: 12345, status: 'success' } }
-    }
-  }
-}
 
 export const useWalletStore = defineStore('wallet', () => {
   // State
