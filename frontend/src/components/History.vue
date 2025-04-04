@@ -6,7 +6,7 @@
         <span class="text-h5 font-weight-medium">Transaction History</span>
       </div>
       <v-spacer></v-spacer>
-      <v-btn icon @click="$emit('close')" class="close-btn">
+      <v-btn v-if="showCloseButton" icon @click="$emit('close')" class="close-btn">
         <v-icon>mdi-close</v-icon>
       </v-btn>
     </v-card-title>
@@ -48,7 +48,16 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, defineProps, defineEmits } from 'vue'
+
+defineProps({
+  showCloseButton: {
+    type: Boolean,
+    default: false
+  }
+})
+
+defineEmits(['close'])
 
 // 示例數據
 const transactions = ref([

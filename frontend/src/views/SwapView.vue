@@ -1,17 +1,13 @@
 <template>
   <div class="swap-container">
-    <!-- 頂部導航欄 -->
-    <v-app-bar class="nav-bar">
-      <v-btn to="/home" class="nav-btn" variant="text">
-        <v-icon left>mdi-arrow-left</v-icon>
-        Back
-      </v-btn>
-      <v-spacer></v-spacer>
-      <v-btn to="/history" class="nav-btn" variant="text">
-        <v-icon left>mdi-history</v-icon>
-        History
-      </v-btn>
-    </v-app-bar>
+    <!-- 使用新的導航欄組件 -->
+    <NavigationBar 
+      :navigationItems="navigationItems"
+      :showBackButton="true"
+      backRoute="/home"
+      :showWallet="true"
+      @logout="handleLogout"
+    />
 
     <!-- 主要內容 -->
     <div class="content-container">
@@ -214,6 +210,12 @@
 <script setup>
 import { ref } from 'vue'
 import axios from 'axios'
+import NavigationBar from '../components/NavigationBar.vue'
+
+// Navigation items for the navigation bar
+const navigationItems = [
+  { icon: 'mdi-history', title: 'History', route: '/history' }
+]
 
 const isLoading = ref(false)
 const tokens = ref([])
@@ -261,6 +263,15 @@ function swapTokens() {
   selectedToToken.value = temp
 }
 
+function handleLogout() {
+  console.log('User logged out')
+  // Reset any swap-specific state if needed
+  selectedFromToken.value = null
+  selectedToToken.value = null
+  fromAmount.value = ''
+  toAmount.value = ''
+}
+
 // 初始化時自動獲取代幣列表
 checkWalletTokens()
 </script>
@@ -269,23 +280,6 @@ checkWalletTokens()
 .swap-container {
   min-height: 100vh;
   background: linear-gradient(135deg, #FFF5F5 0%, #FFE0E0 100%);
-}
-
-.nav-bar {
-  background: linear-gradient(45deg, #FF9999, #FFB6C1) !important;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
-}
-
-.nav-btn {
-  color: white !important;
-  font-weight: 500 !important;
-  letter-spacing: 0.5px;
-  margin: 0 0.5rem !important;
-  transition: all 0.3s ease;
-}
-
-.nav-btn:hover {
-  transform: translateY(-2px);
 }
 
 .content-container {
