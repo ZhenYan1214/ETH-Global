@@ -25,13 +25,14 @@ const theme = {
 <style>
 .v-application {
   font-family: 'Roboto', sans-serif;
+  background: linear-gradient(135deg, #FFF5F5 0%, #FFE0E0 100%) !important;
 }
 
 /* 自定義主題顏色 */
 :root {
-  --v-primary-base: #FF9999;
-  --v-secondary-base: #FFB6C1;
-  --v-accent-base: #FFC0CB;
+  --v-theme-primary: #FF9999;
+  --v-theme-secondary: #FFB6C1;
+  --v-theme-accent: #FFC0CB;
 }
 
 .footer-text {

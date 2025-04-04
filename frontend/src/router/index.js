@@ -1,25 +1,29 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import Website from '../views/Website.vue'
+import HomeView from '../views/HomeView.vue'
+import SwapView from '../views/SwapView.vue'
+import History from '../components/History.vue'
 
 const routes = [
   {
     path: '/',
     name: 'website',
-    component: () => import('../views/Website.vue')
+    component: Website
   },
   {
     path: '/home',
     name: 'home',
-    component: () => import('../views/HomeView.vue')
+    component: HomeView
   },
   {
     path: '/swap',
     name: 'swap',
-    component: () => import('../views/Swap.vue')
+    component: SwapView
   },
   {
     path: '/history',
     name: 'history',
-    component: () => import('../components/History.vue')
+    component: History
   }
 ]
 
