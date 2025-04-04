@@ -1,17 +1,12 @@
 <template>
   <div class="home-container">
-    <!-- 頂部導航欄 -->
-    <v-app-bar class="nav-bar">
-      <v-spacer></v-spacer>
-      <v-btn to="/swap" class="nav-btn" variant="text">
-        <v-icon left>mdi-swap-horizontal</v-icon>
-        Swap
-      </v-btn>
-      <v-btn to="/history" class="nav-btn" variant="text">
-        <v-icon left>mdi-history</v-icon>
-        History
-      </v-btn>
-    </v-app-bar>
+    <!-- 使用新的導航欄組件 -->
+    <NavigationBar 
+      :navigationItems="navigationItems"
+      :showWallet="true"
+      @toggle-wallet="showWalletInfo = !showWalletInfo"
+      @logout="handleLogout"
+    />
 
     <!-- 主要內容 -->
     <div class="content-container">
@@ -24,7 +19,7 @@
         <!-- 餘額顯示 -->
         <div class="balance-display">
           <p class="balance-label">總資產</p>
-          <h2 class="balance-amount">0.00 ETH</h2>
+          <h2 class="balance-amount">{{ walletStore.isConnected ? walletStore.balance + ' ETH' : '0.00 ETH' }}</h2>
           <p class="apy-info">年化收益率: <span class="apy-value">5.5%</span></p>
         </div>
 
@@ -45,9 +40,27 @@
 
 <script setup>
 import { ref } from 'vue'
+import NavigationBar from '../components/NavigationBar.vue'
+import { useWalletStore } from '../store/wallet'
+
+const walletStore = useWalletStore()
+
+// Navigation items for the navigation bar
+const navigationItems = [
+  { icon: 'mdi-swap-horizontal', title: 'Swap', route: '/swap' },
+  { icon: 'mdi-history', title: 'History', route: '/history' }
+]
+
+const showWalletInfo = ref(false)
 
 function openPiggyBank() {
   console.log('Opening piggy bank...')
+}
+
+function handleLogout() {
+  console.log('User logged out')
+  showWalletInfo.value = false
+  // Handle any additional cleanup needed after logout
 }
 </script>
 
@@ -55,23 +68,6 @@ function openPiggyBank() {
 .home-container {
   min-height: 100vh;
   background: linear-gradient(135deg, #FFF5F5 0%, #FFE0E0 100%);
-}
-
-.nav-bar {
-  background: linear-gradient(45deg, #FF9999, #FFB6C1) !important;
-  border-bottom: 2px solid rgba(255, 255, 255, 0.1);
-}
-
-.nav-btn {
-  color: white !important;
-  font-weight: 500 !important;
-  letter-spacing: 0.5px;
-  margin: 0 0.5rem !important;
-  transition: all 0.3s ease;
-}
-
-.nav-btn:hover {
-  transform: translateY(-2px);
 }
 
 .content-container {
