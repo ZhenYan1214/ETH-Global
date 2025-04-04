@@ -271,11 +271,9 @@ function swapTokens() {
   selectedToToken.value = temp
 }
 
-<<<<<<< HEAD
 onMounted(() => {
   checkWalletTokens()
 })
-=======
 function handleLogout() {
   console.log('User logged out')
   // Reset any swap-specific state if needed
@@ -285,9 +283,6 @@ function handleLogout() {
   toAmount.value = ''
 }
 
-// 初始化時自動獲取代幣列表
-checkWalletTokens()
->>>>>>> 563bc47b59792eb4fcd25a87f40c56da9f1ea88c
 </script>
 
 <style scoped>
