@@ -23,5 +23,9 @@ const vuetify = createVuetify({
 const app = createApp(App)
 app.use(pinia)
 app.use(router)
+<<<<<<< HEAD
 app.use(vuetify)
+=======
+
+>>>>>>> 836f727 (revise the server)
 app.mount('#app')
