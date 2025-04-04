@@ -126,8 +126,8 @@ const connectWallet = async () => {
   walletError.value = ''
   
   try {
-    walletStore.usernameInput.value = username.value
-    walletStore.isRegistering.value = isRegistering.value
+    walletStore.usernameInput = username.value
+    walletStore.isRegistering = isRegistering.value
     
     const result = await walletStore.connect()
     if (result.success) {
