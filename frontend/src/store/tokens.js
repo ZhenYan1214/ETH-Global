@@ -11,6 +11,7 @@ export const useTokenStore = defineStore('tokens', {
     isLoadingAllTokens: false,
     error: null,
     selectedFromToken: null,
+    selectedFromTokens: [],
     selectedToToken: null,
     fromAmount: '',
     toAmount: '',
@@ -22,11 +23,38 @@ export const useTokenStore = defineStore('tokens', {
   getters: {
     hasTokens: (state) => state.tokens.length > 0,
     
+    totalFromAmount: (state) => {
+      if (state.selectedFromTokens.length === 0) return 0;
+      
+      return state.selectedFromTokens.reduce((total, token) => {
+        const amount = token.amount || '0';
+        const price = token.price || '0';
+        
+        const amountValue = amount === '' ? 0 : Number(amount);
+        const priceValue = price === '' ? 0 : Number(price);
+        return total + (amountValue * priceValue);
+      }, 0);
+    },
+    
     canSwap: (state) => {
+      if (state.selectedFromTokens.length > 0) {
+        return state.selectedToToken && 
+               state.selectedFromTokens.some(t => {
+                 const amount = t.amount || '0';
+                 return amount !== '' && amount !== '0';
+               }) &&
+               !state.isLoading;
+      }
+      
       return state.selectedFromToken && 
              state.selectedToToken && 
-             parseFloat(state.fromAmount) > 0 &&
-             !state.isLoading
+             state.fromAmount !== '' && 
+             state.fromAmount !== '0' &&
+             !state.isLoading;
+    },
+    
+    isTokenSelected: (state) => (address) => {
+      return state.selectedFromTokens.some(t => t.address.toLowerCase() === address.toLowerCase());
     }
   },
   
@@ -156,8 +184,8 @@ export const useTokenStore = defineStore('tokens', {
         }
         
         const filteredTokens = balanceResponse.balances.filter(token => {
-          const balance = parseFloat(token.balance)
-          return balance > 0
+          const balance = token.balance || '0'
+          return balance !== '' && balance !== '0'
         })
         
         if (filteredTokens.length === 0) {
@@ -176,7 +204,7 @@ export const useTokenStore = defineStore('tokens', {
         
         this.tokens = filteredTokens.map(token => ({
           address: token.token,
-          balance: parseFloat(token.balance).toFixed(4),
+          balance: token.balance,
           price: priceResponse[token.token] || '0.00'
         }))
         
@@ -318,8 +346,9 @@ export const useTokenStore = defineStore('tokens', {
         return
       }
       
-      const amount = parseFloat(this.fromAmount)
-      const rate = parseFloat(this.exchangeRate)
+      // 使用 Number 替代 parseFloat，並確保處理空字符串的情況
+      const amount = this.fromAmount === '' ? 0 : Number(this.fromAmount)
+      const rate = this.exchangeRate === '' ? 0 : Number(this.exchangeRate)
       
       if (!isNaN(amount) && !isNaN(rate)) {
         this.toAmount = (amount * rate).toFixed(6)
@@ -397,6 +426,122 @@ export const useTokenStore = defineStore('tokens', {
       this.fromAmount = ''
       this.toAmount = ''
       this.exchangeRate = null
+    },
+    
+    // 添加代幣到多選列表
+    toggleFromToken(address) {
+      // 檢查 token 是否已在選擇列表中
+      const index = this.selectedFromTokens.findIndex(t => t.address.toLowerCase() === address.toLowerCase());
+      
+      // 如果已選擇，則移除
+      if (index !== -1) {
+        this.selectedFromTokens.splice(index, 1);
+        // 如果列表已空，重置狀態
+        if (this.selectedFromTokens.length === 0) {
+          this.fromAmount = '';
+          this.toAmount = '';
+        } else {
+          // 重新計算交換比率
+          this.calculateMultiTokenExchangeRate();
+        }
+        return;
+      }
+      
+      // 如果未選擇，則添加
+      // 先查找 token 詳情
+      const token = this.tokens.find(t => t.address.toLowerCase() === address.toLowerCase());
+      
+      if (token) {
+        // 添加到選擇列表，初始設置 amount 為 0
+        this.selectedFromTokens.push({
+          ...token,
+          amount: '0'
+        });
+        
+        this.calculateMultiTokenExchangeRate();
+        return;
+      }
+      
+      // 嘗試從 allTokens 中查找
+      if (this.allTokens[address.toLowerCase()]) {
+        const tokenInfo = this.allTokens[address.toLowerCase()];
+        const newToken = {
+          address: address.toLowerCase(),
+          symbol: tokenInfo.symbol,
+          name: tokenInfo.name,
+          decimals: tokenInfo.decimals,
+          balance: '0.0000',
+          price: '0.00',
+          amount: '0'
+        };
+        
+        // 獲取價格信息
+        this.fetchTokenPrice(address).then(price => {
+          const tokenIndex = this.selectedFromTokens.findIndex(t => t.address === address.toLowerCase());
+          if (tokenIndex !== -1) {
+            this.selectedFromTokens[tokenIndex].price = price;
+            this.calculateMultiTokenExchangeRate();
+          }
+        });
+        
+        this.selectedFromTokens.push(newToken);
+        this.calculateMultiTokenExchangeRate();
+        return;
+      }
+      
+      console.error('Token not found:', address);
+    },
+    
+    // 更新多選 token 的數量
+    updateFromTokenAmount(address, amount) {
+      const index = this.selectedFromTokens.findIndex(t => t.address.toLowerCase() === address.toLowerCase());
+      if (index !== -1) {
+        this.selectedFromTokens[index].amount = String(amount);
+        this.calculateMultiTokenExchangeRate();
+      }
+    },
+    
+    // 計算多選 token 的交換比率
+    calculateMultiTokenExchangeRate() {
+      if (this.selectedFromTokens.length === 0 || !this.selectedToToken) {
+        this.exchangeRate = null;
+        this.toAmount = '';
+        return;
+      }
+      
+      try {
+        // 計算所有選擇的 from tokens 的價值總額，避免直接使用 parseFloat
+        const totalFromValue = this.selectedFromTokens.reduce((total, token) => {
+          const amount = token.amount || '0';
+          const price = token.price || '0';
+          
+          // 只在計算時轉換為數字
+          const amountValue = amount === '' ? 0 : Number(amount);
+          const priceValue = price === '' ? 0 : Number(price);
+          
+          return total + (amountValue * priceValue);
+        }, 0);
+        
+        const toPrice = Number(this.selectedToToken.price || '0');
+        
+        if (totalFromValue > 0 && toPrice > 0) {
+          // 計算能獲得的目標 token 數量，最後才轉換為字符串
+          this.toAmount = (totalFromValue / toPrice).toFixed(6);
+        } else {
+          this.toAmount = '';
+        }
+      } catch (error) {
+        console.error('Error calculating multi-token exchange rate:', error);
+        this.toAmount = '';
+      }
+    },
+    
+    // 清空所有已選擇的 from tokens
+    clearSelectedFromTokens() {
+      this.selectedFromTokens = [];
+      this.fromAmount = '';
+      this.toAmount = '';
+      this.exchangeRate = null;
     }
   }
 }) 

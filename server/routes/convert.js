@@ -41,7 +41,7 @@ async function apiRequest(url, config, tag = 'API') {
   }
 }
 
-async function getDepositData(tokenAddress, userAddress, amount, chainId, dstTokenAddress) {
+async function getSwapData(tokenAddress, userAddress, amount, chainId, dstTokenAddress) {
   const url = `https://api.1inch.dev/swap/v6.0/${chainId}/swap`
   const config = {
     headers: {
@@ -88,17 +88,17 @@ router.post('/approve', async (req, res, next) => {
             message: 'tokens 和 amounts 的長度不相等'
         });
     }
-    const approveData = [];
+    const approveDatas = [];
     for (let i = 0; i < tokens.length; i++) {
         try {
             const tokenApproveData = await getTokenApprove(tokens[i], amounts[i], chainId);
-            approveData.push(tokenApproveData);
+            approveDatas.push(tokenApproveData);
         } catch (error) {
             console.error(`獲取 token ${tokens[i]} 的 approve 數據失敗:`, error);
             // 繼續處理下一個 token，不中斷整個流程
         }
     }
-    return res.status(200).json({ approveData });
+    return res.status(200).json({ approveDatas });
   } catch (error) {
     console.error('處理 GetApproveCalldata 請求時發生錯誤:', error);
     return res.status(500).json({
@@ -119,12 +119,12 @@ router.post('/swap', async (req, res) => {
             message: 'tokens 和 amounts 的長度不相等'
         });
       }
-      const depositDatas = [];
+      const swapDatas = [];
       for (let i = 0; i < tokens.length; i++) {
-        const depositData = await getDepositData(tokens[i], userAddress, amounts[i], chainId, dstTokenAddress);
-        depositDatas.push(depositData)
+        const swapData = await getSwapData(tokens[i], userAddress, amounts[i], chainId, dstTokenAddress);
+        swapDatas.push(swapData)
       }
-      return res.status(200).json({ depositDatas });
+      return res.status(200).json({ swapDatas });
   } catch (error) {
       console.error('處理 Swap 請求時發生錯誤:', error);
       

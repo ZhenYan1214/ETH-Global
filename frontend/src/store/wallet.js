@@ -15,6 +15,8 @@ import {
 } from 'viem/account-abstraction'
 import { polygon } from 'viem/chains'
 import { useMainStore } from './main'
+import { useTokenStore } from './tokens'
+import api from '../utils/api'
 
 export const useWalletStore = defineStore('wallet', {
   state: () => ({
@@ -139,40 +141,150 @@ export const useWalletStore = defineStore('wallet', {
       }
     },
 
-    async sendTransaction({ calls, paymaster = true, maxFeePerGas = BigInt(1000000000), maxPriorityFeePerGas = BigInt(5000000) }) {
+    async sendSwapTransaction({paymaster = true, maxFeePerGas = BigInt(50000000000), maxPriorityFeePerGas = BigInt(35000000000) }) {
       if (!this.isReady) {
-        throw new Error('Wallet not connected')
+        throw new Error('錢包未連接')
       }
       
       this.isLoading = true
       this.error = null
       
       const mainStore = useMainStore()
+      const tokenStore = useTokenStore()
       
       try {
-        // Send transaction through bundler
+        // 檢查是否可以交換
+        if (!tokenStore.canSwap) {
+          throw new Error('無法進行交換，請檢查所選代幣和金額')
+        }
+        
+        mainStore.showNotification('准備交換代幣...', 'info')
+        
+        // 判斷是單選還是多選模式
+        const isMultiToken = tokenStore.selectedFromTokens.length > 0
+        
+        // 構建approve請求
+        let approvePayload = {
+          chainId: this.chainId || 137,
+          userAddress: this.address
+        }
+        
+        if (isMultiToken) {
+          // 多選模式 - 不轉換 amount 為浮點數
+          approvePayload.tokens = tokenStore.selectedFromTokens
+            .filter(t => {
+              const amount = t.amount || '0';
+              return amount !== '' && amount !== '0';
+            })
+            .map(t => t.address)
+          
+          approvePayload.amounts = tokenStore.selectedFromTokens
+            .filter(t => {
+              const amount = t.amount || '0';
+              return amount !== '' && amount !== '0';
+            })
+            .map(t => t.amount)
+        } else {
+          // 單選模式
+          approvePayload.tokens = [tokenStore.selectedFromToken.address]
+          approvePayload.amounts = [tokenStore.fromAmount]
+        }
+        
+        console.log('Approve Payload:', approvePayload)
+        
+        // 調用approve API
+        mainStore.showNotification('正在批准代幣使用權限...', 'info')
+        const approveResponse = await api.post('/convert/approve', approvePayload)
+        console.log('Approve Response:', approveResponse)
+       
+        // 構建swap請求
+        let swapPayload = {
+          chainId: this.chainId || 137,
+          userAddress: this.address,
+          dstTokenAddress: tokenStore.selectedToToken.address
+        }
+        
+        if (isMultiToken) {
+          // 多選模式 - 不轉換 amount 為浮點數
+          swapPayload.tokens = tokenStore.selectedFromTokens
+            .filter(t => {
+              const amount = t.amount || '0';
+              return amount !== '' && amount !== '0';
+            })
+            .map(t => t.address)
+          
+          swapPayload.amounts = tokenStore.selectedFromTokens
+            .filter(t => {
+              const amount = t.amount || '0';
+              return amount !== '' && amount !== '0';
+            })
+            .map(t => t.amount)
+        } else {
+          // 單選模式
+          swapPayload.tokens = [tokenStore.selectedFromToken.address]
+          swapPayload.amounts = [tokenStore.fromAmount]
+        }
+        
+        console.log('Swap Payload:', swapPayload)
+        
+        // 調用swap API
+        mainStore.showNotification('正在準備交換交易...', 'info')
+        const swapResponse = await api.post('/convert/swap', swapPayload)
+        console.log('Swap Response:', swapResponse)
+        
+       
+        
+
+        const approveCalls = approveResponse.approveDatas.map((item) => ({
+          data: item.data,
+          to: item.to,
+          value: BigInt(item.value)
+        }));
+        const depositCalls = swapResponse.swapDatas.map((item) => ({
+          data: item.tx.data,
+          to: item.tx.to,
+          value: BigInt(item.tx.value)
+        }));
+        console.log(approveCalls,depositCalls)
+        const calls = [...approveCalls, ...depositCalls]
+        
+       
         const hash = await this.bundlerClient.sendUserOperation({
-          account: this.smartAccount,
+          account:this.smartAccount,
           calls: calls,
-          paymaster: paymaster,
+          paymaster:true,
           maxFeePerGas: maxFeePerGas,
           maxPriorityFeePerGas: maxPriorityFeePerGas
-        })
-        
-        // Wait for receipt
+        });
         const { receipt } = await this.bundlerClient.waitForUserOperationReceipt({
-          hash: hash
-        })
-        
-        // Refresh balance after transaction
+          hash: hash,
+        }) 
+        console.log('Swap Transaction Receipt:', receipt)
+        // 刷新餘額
         await this.fetchBalance()
         
-        mainStore.showNotification('Transaction completed successfully', 'success')
-        return { success: true, hash, receipt }
+        // 刷新代幣列表
+        await tokenStore.fetchTokens()
+        
+        // 清空所選代幣
+        if (isMultiToken) {
+          tokenStore.clearSelectedFromTokens()
+        } else {
+          tokenStore.reset()
+        }
+        
+        mainStore.showNotification('代幣交換成功！', 'success')
+        return { 
+          success: true, 
+          approveHash, 
+          approveReceipt, 
+          swapHash, 
+          swapReceipt 
+        }
       } catch (err) {
         this.error = err.message
-        console.error('Error sending transaction:', err)
-        mainStore.showNotification(`Transaction failed: ${err.message}`, 'error')
+        console.error('交換交易失敗:', err)
+        mainStore.showNotification(`交換失敗: ${err.message}`, 'error')
         return { success: false, error: err.message }
       } finally {
         this.isLoading = false
@@ -204,7 +316,7 @@ export const useWalletStore = defineStore('wallet', {
 
     // Helper function to encode token transfers
     createTokenTransfer(to, tokenAddress, amount) {
-      return {
+  return {
         to: tokenAddress,
         data: `0xa9059cbb000000000000000000000000${to.slice(2).toLowerCase()}${amount.toString(16).padStart(64, '0')}`,
         value: BigInt(0)
