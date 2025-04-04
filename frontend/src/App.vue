@@ -1,39 +1,53 @@
 <script setup>
-// Component logic will be added here
+import { ref } from 'vue'
+
+const drawer = ref(false)
+const items = [
+  { title: 'Home', icon: 'mdi-home', to: '/home' },
+  { title: 'Swap', icon: 'mdi-swap-horizontal', to: '/swap' },
+]
 </script>
 
 <template>
-  <div class="min-h-screen bg-gray-100">
-    <nav class="bg-white shadow-lg">
-      <div class="max-w-7xl mx-auto px-4">
-        <div class="flex justify-between h-16">
-          <div class="flex">
-            <router-link to="/" class="flex items-center">
-              <span class="text-xl font-bold text-primary">Piggy Vault</span>
-            </router-link>
-          </div>
-          <div class="flex items-center">
-            <router-link to="/home" class="text-gray-700 hover:text-primary px-3 py-2">Home</router-link>
-            <router-link to="/swap" class="text-gray-700 hover:text-primary px-3 py-2">Swap</router-link>
-          </div>
-        </div>
-      </div>
-    </nav>
-    <router-view></router-view>
-  </div>
+  <v-app>
+    <v-app-bar color="primary">
+      <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
+      <v-app-bar-title>
+        <router-link to="/" class="text-decoration-none text-white">
+          Piggy Vault
+        </router-link>
+      </v-app-bar-title>
+      <v-spacer></v-spacer>
+      <v-btn to="/home" text>Home</v-btn>
+      <v-btn to="/swap" text>Swap</v-btn>
+    </v-app-bar>
+
+    <v-navigation-drawer v-model="drawer" temporary>
+      <v-list>
+        <v-list-item
+          v-for="item in items"
+          :key="item.title"
+          :to="item.to"
+          :prepend-icon="item.icon"
+          :title="item.title"
+        ></v-list-item>
+      </v-list>
+    </v-navigation-drawer>
+
+    <v-main>
+      <v-container>
+        <router-view></router-view>
+      </v-container>
+    </v-main>
+
+    <v-footer app color="primary" class="text-center d-flex justify-center">
+      <span class="white--text">&copy; {{ new Date().getFullYear() }} Piggy Vault</span>
+    </v-footer>
+  </v-app>
 </template>
 
-<style scoped>
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.vue:hover {
-  filter: drop-shadow(0 0 2em #42b883aa);
+<style>
+.v-application {
+  font-family: 'Roboto', sans-serif;
 }
 </style>
