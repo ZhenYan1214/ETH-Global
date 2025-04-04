@@ -36,7 +36,17 @@ app.get("/wallet/balances/:chainId/:walletAddress", async (req, res) => {
     res.status(200).json(result);
   } catch (error) {
     console.error("前端請求失敗:", error.message); // 添加錯誤日誌
-    res.status(500).json({ error: "無法獲取錢包餘額", details: error.message });
+    // 如果是 429 錯誤，仍然返回餘額資料（如果有）
+    if (error.message.includes("429")) {
+      res.status(200).json({
+        walletAddress,
+        chainId,
+        balances: [], // 如果餘額查詢也失敗，返回空陣列
+        warning: "Unable to fetch prices due to rate limit, but balances may still be available.",
+      });
+    } else {
+      res.status(500).json({ error: "無法獲取錢包餘額", details: error.message });
+    }
   }
 });
 
