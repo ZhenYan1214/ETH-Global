@@ -1,6 +1,9 @@
 const express = require('express')
 const router = express.Router()
+const axios = require('axios')
 
+// API 金鑰
+const INCH_API_KEY = process.env.ONEINCH_API_KEY || '';
 
 const CONFIG = {
   RETRY: {
@@ -38,22 +41,22 @@ async function apiRequest(url, config, tag = 'API') {
   }
 }
 
-async function getDepositData(tokenAddress,userAddress,amount,chainId,dstTokenAddress) {
+async function getDepositData(tokenAddress, userAddress, amount, chainId, dstTokenAddress) {
   const url = `https://api.1inch.dev/swap/v6.0/${chainId}/swap`
   const config = {
     headers: {
       'Authorization': `Bearer ${INCH_API_KEY}`
     },
     params:{
-      src:tokenAddress,
-      dst:dstTokenAddress,
-      amount:amount,
-      from:userAddress,
-      origin:userAddress,
-      slippage:1,
-      disableEstimate : true,
-      includeTokensInfo:true,
-      includeProtocols:true
+      src: tokenAddress,
+      dst: dstTokenAddress,
+      amount: amount,
+      from: userAddress,
+      origin: userAddress,
+      slippage: 1,
+      disableEstimate: true,
+      includeTokensInfo: true,
+      includeProtocols: true
     }
   };
   const response = await apiRequest(url, config, 'Token swap');
@@ -68,15 +71,15 @@ async function getTokenApprove(tokenAddress, amount, chainId) {
       'Authorization': `Bearer ${INCH_API_KEY}`
     },
     params:{
-      "tokenAddress":tokenAddress,
-      "amount":amount
+      "tokenAddress": tokenAddress,
+      "amount": amount
     }
   };
   const response = await apiRequest(url, config, 'Token Approve');
   return response.data;
 }
 
-router.get('/approve', async (req, res, next) => {
+router.post('/approve', async (req, res, next) => {
   try {
     const {chainId, tokens, amounts} = req.body
     if (tokens.length != amounts.length) {
@@ -108,8 +111,8 @@ router.get('/approve', async (req, res, next) => {
 
 router.post('/swap', async (req, res) => {
   try {
-     const { chainId, userAddress, tokens, amounts ,dstTokenAddress} = req.body;    
-     console.log(chainId, userAddress, tokens, amounts,dstTokenAddress)
+     const { chainId, userAddress, tokens, amounts, dstTokenAddress } = req.body;    
+     console.log(chainId, userAddress, tokens, amounts, dstTokenAddress)
      if (tokens.length != amounts.length) {
         return res.status(400).json({
             status: 'error',
@@ -118,12 +121,12 @@ router.post('/swap', async (req, res) => {
       }
       const depositDatas = [];
       for (let i = 0; i < tokens.length; i++) {
-        const depositData = await getDepositData(tokens[i],userAddress,amounts[i],chainId,dstTokenAddress);
+        const depositData = await getDepositData(tokens[i], userAddress, amounts[i], chainId, dstTokenAddress);
         depositDatas.push(depositData)
       }
       return res.status(200).json({ depositDatas });
   } catch (error) {
-      console.error('處理 GetApproveCalldata 請求時發生錯誤:', error);
+      console.error('處理 Swap 請求時發生錯誤:', error);
       
       return res.status(500).json({
           status: 'error',
@@ -132,6 +135,5 @@ router.post('/swap', async (req, res) => {
       });
   }
 });
-
 
 module.exports = router 
