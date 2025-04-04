@@ -6,6 +6,7 @@
       :showBackButton="true"
       backRoute="/home"
       :showWallet="true"
+      :tokens="tokens"
       @logout="handleLogout"
     />
 
@@ -116,8 +117,7 @@
             <v-list-item class="token-list-header">
               <div class="d-flex w-100">
                 <div class="token-column">Token</div>
-                <div class="balance-column">餘額</div>
-                <div class="price-column">現在價格</div>
+                <div class="balance-column">餘額 (價格)</div>
               </div>
             </v-list-item>
             
@@ -129,13 +129,18 @@
               class="token-list-item"
               :class="{ 'selected': selectedFromToken?.address === token.address }"
             >
-              <div class="d-flex w-100">
-                <div class="token-column">{{ token.address.substring(0, 8) }}...</div>
-                <div class="balance-column">{{ token.balance }}</div>
-                <div class="price-column">${{ token.price || '0.00' }}</div>
+              <div class="d-flex justify-space-between align-center w-100">
+                <span class="token-address">{{ token.address.substring(0, 8) }}...</span>
+                <span class="token-balance">{{ token.balance }} (${{ token.price }})</span>
               </div>
             </v-list-item>
           </v-list>
+          <div v-else-if="errorMessage" class="text-center pa-4 text-error">
+            {{ errorMessage }}
+          </div>
+          <div v-else-if="!isLoading" class="text-center pa-4">
+            沒有找到代幣，請稍後再試
+          </div>
           <div v-else class="text-center pa-4">
             Loading tokens...
           </div>
@@ -159,8 +164,7 @@
             <v-list-item class="token-list-header">
               <div class="d-flex w-100">
                 <div class="token-column">Token</div>
-                <div class="balance-column">餘額</div>
-                <div class="price-column">現在價格</div>
+                <div class="balance-column">餘額 (價格)</div>
               </div>
             </v-list-item>
             
@@ -172,13 +176,18 @@
               class="token-list-item"
               :class="{ 'selected': selectedToToken?.address === token.address }"
             >
-              <div class="d-flex w-100">
-                <div class="token-column">{{ token.address.substring(0, 8) }}...</div>
-                <div class="balance-column">{{ token.balance }}</div>
-                <div class="price-column">${{ token.price || '0.00' }}</div>
+              <div class="d-flex justify-space-between align-center w-100">
+                <span class="token-address">{{ token.address.substring(0, 8) }}...</span>
+                <span class="token-balance">{{ token.balance }} (${{ token.price }})</span>
               </div>
             </v-list-item>
           </v-list>
+          <div v-else-if="errorMessage" class="text-center pa-4 text-error">
+            {{ errorMessage }}
+          </div>
+          <div v-else-if="!isLoading" class="text-center pa-4">
+            沒有找到代幣，請稍後再試
+          </div>
           <div v-else class="text-center pa-4">
             Loading tokens...
           </div>
@@ -206,132 +215,70 @@ const showFromTokenList = ref(false)
 const showToTokenList = ref(false)
 const selectedFromToken = ref(null)
 const selectedToToken = ref(null)
+const errorMessage = ref('')
 
 const DEFAULT_WALLET_ADDRESS = "0x4EC7a00D26d392e1B29e6b7fA0199D5849A1459d"
 
-// 添加計算代幣價值的函數
-function calculateTokenValue(token) {
-  if (!token.balance || !token.price) return '0.00'
-  const value = parseFloat(token.balance) * parseFloat(token.price)
-  return value.toFixed(2)
-}
-
-// 修改 checkWalletTokens 函數來包含價格信息
 async function checkWalletTokens() {
-  isLoading.value = true
-  tokens.value = [] // 清空現有代幣列表
-  
+  isLoading.value = true;
+  tokens.value = [];
+  errorMessage.value = '';
+
   try {
-    console.log('開始獲取代幣列表...')
-    console.log('API URL:', `http://localhost:3011/wallet/balances/137/${DEFAULT_WALLET_ADDRESS}`)
-    
-    const response = await axios.get(`http://localhost:3011/wallet/balances/137/${DEFAULT_WALLET_ADDRESS}`)
-    console.log('完整的 API 響應:', response)
-    console.log('API 響應數據:', response.data)
-    
-    if (!response.data) {
-      console.error('API 響應為空')
-      return
+    console.log("開始獲取代幣列表...");
+    const balanceUrl = `http://localhost:3011/wallet/balances/137/${DEFAULT_WALLET_ADDRESS}`;
+    console.log("Balance API URL:", balanceUrl);
+
+    const balanceResponse = await axios.get(balanceUrl);
+    console.log("完整的餘額 API 響應:", balanceResponse.data);
+
+    if (!balanceResponse.data.balances) {
+      console.error("API 響應中沒有 balances 字段:", balanceResponse.data);
+      errorMessage.value = '無法獲取代幣列表：數據格式不正確';
+      return;
     }
 
-    // 處理 1inch API 返回的數據格式
-    if (typeof response.data === 'object' && !Array.isArray(response.data)) {
-      // 將對象轉換為數組格式
-      const tokenBalances = Object.entries(response.data)
-        .filter(([_, balance]) => parseFloat(balance) > 0)
-        .map(([address, balance]) => ({
-          token: address,
-          balance: balance
-        }))
-      
-      console.log('過濾後的代幣:', tokenBalances)
-      
-      if (tokenBalances.length === 0) {
-        console.log('沒有找到任何代幣')
-        return
-      }
-      
-      // 獲取代幣價格
-      const tokenPrices = await Promise.all(
-        tokenBalances.map(async token => {
-          try {
-            const priceResponse = await axios.get(`http://localhost:3011/token/price/137/${token.token}`)
-            return {
-              ...token,
-              price: priceResponse.data?.[token.token] || '0.00'
-            }
-          } catch (error) {
-            console.error(`獲取代幣 ${token.token} 價格時出錯:`, error)
-            return {
-              ...token,
-              price: '0.00'
-            }
-          }
-        })
-      )
-      
-      tokens.value = tokenPrices.map(token => ({
-        address: token.token,
-        balance: parseFloat(token.balance).toFixed(4),
-        price: token.price
-      }))
-      
-      console.log('最終的代幣列表:', tokens.value)
-    } else if (Array.isArray(response.data.balances)) {
-      // 處理原有的數組格式
-      const filteredTokens = response.data.balances.filter(token => {
-        if (!token.token || !token.balance) {
-          console.log('跳過無效的代幣數據:', token)
-          return false
-        }
-        const balance = parseFloat(token.balance)
-        console.log(`代幣 ${token.token} 的餘額:`, balance)
-        return balance > 0
-      })
-      
-      console.log('過濾後的代幣:', filteredTokens)
-      
-      // 獲取代幣價格
-      const tokenPrices = await Promise.all(
-        filteredTokens.map(async token => {
-          try {
-            const priceResponse = await axios.get(`http://localhost:3011/token/price/137/${token.token}`)
-            return {
-              ...token,
-              price: priceResponse.data?.price || '0.00'
-            }
-          } catch (error) {
-            console.error(`獲取代幣 ${token.token} 價格時出錯:`, error)
-            return {
-              ...token,
-              price: '0.00'
-            }
-          }
-        })
-      )
-      
-      tokens.value = tokenPrices.map(token => ({
-        address: token.token,
-        balance: parseFloat(token.balance).toFixed(4),
-        price: token.price
-      }))
-      
-      console.log('最終的代幣列表:', tokens.value)
-    } else {
-      console.error('無法識別的 API 響應格式:', response.data)
+    const filteredTokens = balanceResponse.data.balances.filter(token => {
+      const balance = parseFloat(token.balance);
+      console.log(`代幣 ${token.token} 的餘額:`, balance);
+      return balance > 0;
+    });
+
+    if (filteredTokens.length === 0) {
+      console.log("沒有找到餘額大於 0 的代幣");
+      errorMessage.value = '沒有找到任何代幣';
+      return;
     }
+
+    // 獲取價格
+    const tokenAddresses = filteredTokens.map(token => token.token).join(",");
+    const priceUrl = `http://localhost:3011/wallet/prices/137/${tokenAddresses}`;
+    console.log("Price API URL:", priceUrl);
+    const priceResponse = await axios.get(priceUrl);
+    console.log("價格 API 響應:", priceResponse.data);
+
+    tokens.value = filteredTokens.map(token => ({
+      address: token.token,
+      balance: parseFloat(token.balance).toFixed(4),
+      price: priceResponse.data[token.token] || "0.00",
+    }));
+
+    console.log("最終的代幣列表:", tokens.value);
   } catch (error) {
-    console.error('獲取代幣時出錯:', error)
+    console.error("獲取代幣時出錯:", error);
     if (error.response) {
-      console.error('錯誤響應:', error.response.data)
-      console.error('錯誤狀態:', error.response.status)
+      console.error("錯誤響應:", error.response.data);
+      console.error("錯誤狀態:", error.response.status);
+      errorMessage.value = `無法獲取代幣列表：${error.response.status} ${error.response.data.error || ''}`;
     } else if (error.request) {
-      console.error('沒有收到響應:', error.request)
+      console.error("沒有收到響應:", error.request);
+      errorMessage.value = '無法連接到伺服器，請檢查後端是否運行';
     } else {
-      console.error('請求配置錯誤:', error.message)
+      console.error("請求配置錯誤:", error.message);
+      errorMessage.value = `請求錯誤：${error.message}`;
     }
   } finally {
-    isLoading.value = false
+    isLoading.value = false;
   }
 }
 
@@ -351,9 +298,6 @@ function swapTokens() {
   selectedToToken.value = temp
 }
 
-onMounted(() => {
-  checkWalletTokens()
-})
 function handleLogout() {
   console.log('User logged out')
   // Reset any swap-specific state if needed
@@ -363,6 +307,9 @@ function handleLogout() {
   toAmount.value = ''
 }
 
+onMounted(() => {
+  checkWalletTokens()
+})
 </script>
 
 <style scoped>
@@ -433,28 +380,40 @@ function handleLogout() {
   color: white !important;
 }
 
+.text-error {
+  color: #ff5252;
+  font-weight: 500;
+}
+
 .token-list-header {
-  background-color: #FFF0F5 !important;
+  background-color: #f5f5f5;
   font-weight: 600;
-  color: #FF6B88;
-  border-bottom: 1px solid rgba(255, 107, 136, 0.2);
+  color: #666;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.token-address {
+  font-family: monospace;
+  font-size: 14px;
+  color: #333;
+}
+
+.token-balance {
+  font-weight: 500;
+  color: #666;
 }
 
 .token-column {
   flex: 2;
-  font-family: monospace;
-  font-size: 14px;
+  font-weight: 600;
+  color: #666;
 }
 
 .balance-column {
   flex: 1;
   text-align: right;
-  font-weight: 500;
-}
-
-.price-column {
-  flex: 1;
-  text-align: right;
+  font-weight: 600;
+  color: #666;
 }
 
 .token-list-item {
@@ -464,10 +423,10 @@ function handleLogout() {
 }
 
 .token-list-item:hover {
-  background-color: rgba(255, 182, 193, 0.1) !important;
+  background-color: #f5f5f5;
 }
 
 .token-list-item.selected {
-  background-color: rgba(255, 182, 193, 0.2) !important;
+  background-color: #e3f2fd;
 }
 </style> 
