@@ -1,34 +1,50 @@
 <template>
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <div class="bg-white rounded-lg shadow p-6">
-      <h2 class="text-2xl font-bold text-gray-900 mb-4">Transaction History</h2>
-      <div class="overflow-x-auto">
-        <table class="min-w-full divide-y divide-gray-200">
-          <thead>
-            <tr>
-              <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-              <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-              <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-              <th class="px-6 py-3 bg-gray-50 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-            </tr>
-          </thead>
-          <tbody class="bg-white divide-y divide-gray-200">
-            <!-- 示例交易記錄 -->
-            <tr v-for="(transaction, index) in transactions" :key="index">
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ transaction.date }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ transaction.type }}</td>
-              <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ transaction.amount }}</td>
-              <td class="px-6 py-4 whitespace-nowrap">
-                <span :class="getStatusClass(transaction.status)">
-                  {{ transaction.status }}
-                </span>
-              </td>
-            </tr>
-          </tbody>
-        </table>
+  <v-card class="history-dialog">
+    <v-card-title class="dialog-title">
+      <div class="d-flex align-center">
+        <img src="https://em-content.zobj.net/source/microsoft-teams/363/pig-face_1f437.png" alt="Piggy Logo" class="dialog-logo mr-2" />
+        <span class="text-h5 font-weight-medium">Transaction History</span>
       </div>
-    </div>
-  </div>
+      <v-spacer></v-spacer>
+      <v-btn icon @click="$emit('close')" class="close-btn">
+        <v-icon>mdi-close</v-icon>
+      </v-btn>
+    </v-card-title>
+
+    <v-card-text class="pa-4">
+      <v-table>
+        <thead>
+          <tr>
+            <th class="text-left table-header">Date</th>
+            <th class="text-left table-header">Type</th>
+            <th class="text-left table-header">Amount</th>
+            <th class="text-left table-header">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="(transaction, index) in transactions" :key="index" class="transaction-row">
+            <td>{{ transaction.date }}</td>
+            <td>
+              <v-chip :color="getTypeColor(transaction.type)" size="small" class="type-chip">
+                {{ transaction.type }}
+              </v-chip>
+            </td>
+            <td>{{ transaction.amount }}</td>
+            <td>
+              <v-chip
+                :color="getStatusColor(transaction.status)"
+                size="small"
+                :text-color="getStatusTextColor(transaction.status)"
+                class="status-chip"
+              >
+                {{ transaction.status }}
+              </v-chip>
+            </td>
+          </tr>
+        </tbody>
+      </v-table>
+    </v-card-text>
+  </v-card>
 </template>
 
 <script setup>
@@ -56,23 +72,125 @@ const transactions = ref([
   }
 ])
 
-const getStatusClass = (status) => {
-  const classes = 'px-2 py-1 text-xs font-medium rounded-full '
+const getTypeColor = (type) => {
+  switch (type) {
+    case 'Deposit':
+      return 'pink-lighten-4'
+    case 'Withdraw':
+      return 'pink-lighten-3'
+    case 'Swap':
+      return 'pink-lighten-2'
+    default:
+      return 'pink-lighten-4'
+  }
+}
+
+const getStatusColor = (status) => {
   switch (status) {
     case 'Completed':
-      return classes + 'bg-green-100 text-green-800'
+      return 'success-lighten-4'
     case 'Pending':
-      return classes + 'bg-yellow-100 text-yellow-800'
+      return 'warning-lighten-4'
     case 'Failed':
-      return classes + 'bg-red-100 text-red-800'
+      return 'error-lighten-4'
     default:
-      return classes + 'bg-gray-100 text-gray-800'
+      return 'grey-lighten-4'
+  }
+}
+
+const getStatusTextColor = (status) => {
+  switch (status) {
+    case 'Completed':
+      return 'success'
+    case 'Pending':
+      return 'warning-darken-2'
+    case 'Failed':
+      return 'error-darken-1'
+    default:
+      return 'grey-darken-1'
   }
 }
 </script>
 
 <style scoped>
-.min-w-full {
-  min-width: 100%;
+.history-dialog {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 4px 20px rgba(255, 153, 153, 0.2) !important;
+}
+
+.dialog-title {
+  background: linear-gradient(135deg, #FF9999, #FFB6C1) !important;
+  color: white !important;
+  padding: 16px !important;
+}
+
+.dialog-logo {
+  height: 32px;
+  width: 32px;
+  margin-right: 12px;
+  animation: bounce 2s infinite;
+}
+
+.close-btn {
+  color: white !important;
+  transition: transform 0.3s ease;
+}
+
+.close-btn:hover {
+  transform: rotate(90deg);
+}
+
+.table-header {
+  background-color: #FFF0F5 !important;
+  color: #FF6B88 !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+}
+
+.transaction-row {
+  transition: all 0.3s ease;
+}
+
+.transaction-row:hover {
+  background-color: #FFF0F0;
+  transform: translateX(4px);
+}
+
+.type-chip {
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+.status-chip {
+  font-weight: 500;
+  letter-spacing: 0.5px;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+:deep(.v-table) {
+  background: transparent !important;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(255, 153, 153, 0.1);
+}
+
+:deep(.v-table__wrapper) {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+:deep(.v-table > .v-table__wrapper > table) {
+  background: transparent !important;
 }
 </style> 
