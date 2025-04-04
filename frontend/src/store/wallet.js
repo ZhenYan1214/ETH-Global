@@ -14,12 +14,12 @@ import {
   toWebAuthnAccount,
 } from 'viem/account-abstraction'
 import { polygon } from 'viem/chains'
-
+import { useMainStore } from './main'
 
 export const useWalletStore = defineStore('wallet', {
   state: () => ({
     address: '',
-    chainId: null,
+    chainId: 137, // Default to Polygon
     isConnected: false,
     provider: null,
     signer: null,
@@ -37,7 +37,11 @@ export const useWalletStore = defineStore('wallet', {
   }),
 
   getters: {
-    isReady: (state) => state.bundlerClient !== null && state.isConnected
+    isReady: (state) => state.bundlerClient !== null && state.isConnected,
+    formattedAddress: (state) => {
+      if (!state.address) return ''
+      return `${state.address.substring(0, 6)}...${state.address.substring(state.address.length - 4)}`
+    }
   },
 
   actions: {
@@ -55,13 +59,13 @@ export const useWalletStore = defineStore('wallet', {
       this.error = null
       this.passkeyStatus = 'pending'
       
+      const mainStore = useMainStore()
+      
       try {
         // Environment variables
         const clientKey = import.meta.env.VITE_CLIENT_KEY
         const clientUrl = import.meta.env.VITE_CLIENT_URL
         
-    
-        console.log("help")
         // 1. Create Passkey Transport
         const passkeyTransport = toPasskeyTransport(clientUrl, clientKey)
         
@@ -106,11 +110,13 @@ export const useWalletStore = defineStore('wallet', {
         await this.fetchBalance()
         
         this.passkeyStatus = 'created'
+        mainStore.showNotification('Wallet connected successfully', 'success')
         return { success: true }
       } catch (err) {
         this.error = err.message
         console.error('Error connecting wallet:', err)
         this.passkeyStatus = 'failed'
+        mainStore.showNotification(`Connection failed: ${err.message}`, 'error')
         return { success: false, error: err.message }
       } finally {
         this.isLoading = false
@@ -141,6 +147,8 @@ export const useWalletStore = defineStore('wallet', {
       this.isLoading = true
       this.error = null
       
+      const mainStore = useMainStore()
+      
       try {
         // Send transaction through bundler
         const hash = await this.bundlerClient.sendUserOperation({
@@ -159,10 +167,12 @@ export const useWalletStore = defineStore('wallet', {
         // Refresh balance after transaction
         await this.fetchBalance()
         
+        mainStore.showNotification('Transaction completed successfully', 'success')
         return { success: true, hash, receipt }
       } catch (err) {
         this.error = err.message
         console.error('Error sending transaction:', err)
+        mainStore.showNotification(`Transaction failed: ${err.message}`, 'error')
         return { success: false, error: err.message }
       } finally {
         this.isLoading = false
@@ -187,6 +197,9 @@ export const useWalletStore = defineStore('wallet', {
       this.bundlerClient = null
       this.client = null
       this.passkeyStatus = null
+      
+      const mainStore = useMainStore()
+      mainStore.showNotification('Wallet disconnected', 'info')
     },
 
     // Helper function to encode token transfers

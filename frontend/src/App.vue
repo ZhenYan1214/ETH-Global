@@ -1,5 +1,6 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
+import { useTokenStore } from './store/tokens'
 
 const theme = {
   primary: '#FF9999', // 溫柔的粉紅色
@@ -7,6 +8,17 @@ const theme = {
   accent: '#FFC0CB', // 粉紅色
   title: '#FF6B88', // 標題粉紅
 }
+
+// 在應用啟動時初始化 Token Store
+onMounted(async () => {
+  try {
+    console.log('App mounted - initializing token store...')
+    const tokenStore = useTokenStore()
+    await tokenStore.initialize()
+  } catch (error) {
+    console.error('Failed to initialize app:', error)
+  }
+})
 </script>
 
 <template>
