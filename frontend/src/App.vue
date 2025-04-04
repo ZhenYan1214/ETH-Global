@@ -1,34 +1,23 @@
 <script setup>
 import { ref } from 'vue'
+import History from './components/History.vue'
 
-const drawer = ref(false)
-const items = [
-  { title: 'Home', icon: 'mdi-home', to: '/home' },
-  { title: 'Swap', icon: 'mdi-swap-horizontal', to: '/swap' },
-]
+const theme = {
+  primary: '#FF9999', // 溫柔的粉紅色
+  secondary: '#FFB6C1', // 淺粉紅
+  accent: '#FFC0CB', // 粉紅色
+  title: '#FF6B88', // 標題粉紅
+}
 </script>
 
 <template>
   <v-app>
-    <v-app-bar color="primary">
-      <v-app-bar-title>
-        <router-link to="/" class="text-decoration-none text-white">
-          Piggy Vault
-        </router-link>
-      </v-app-bar-title>
-      <v-spacer></v-spacer>
-      <v-btn to="/swap" text>Swap</v-btn>
-      <v-btn to="/history" text>History</v-btn>
-    </v-app-bar>
-
     <v-main>
-      <v-container>
-        <router-view></router-view>
-      </v-container>
+      <router-view></router-view>
     </v-main>
 
-    <v-footer app color="primary" class="text-center d-flex justify-center">
-      <span class="white--text">&copy; {{ new Date().getFullYear() }} Piggy Vault</span>
+    <v-footer app :color="theme.primary" class="text-center d-flex justify-center">
+      <span class="footer-text">&copy; {{ new Date().getFullYear() }} 🐷 Piggy Vault</span>
     </v-footer>
   </v-app>
 </template>
@@ -36,5 +25,17 @@ const items = [
 <style>
 .v-application {
   font-family: 'Roboto', sans-serif;
+}
+
+/* 自定義主題顏色 */
+:root {
+  --v-primary-base: #FF9999;
+  --v-secondary-base: #FFB6C1;
+  --v-accent-base: #FFC0CB;
+}
+
+.footer-text {
+  color: white;
+  font-weight: 500;
 }
 </style>
