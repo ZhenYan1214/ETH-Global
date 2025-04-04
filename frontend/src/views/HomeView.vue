@@ -3,11 +3,11 @@
     <!-- 頂部導航欄 -->
     <v-app-bar class="nav-bar">
       <v-spacer></v-spacer>
-      <v-btn @click="showSwap = true" class="nav-btn" variant="text">
+      <v-btn to="/swap" class="nav-btn" variant="text">
         <v-icon left>mdi-swap-horizontal</v-icon>
         Swap
       </v-btn>
-      <v-btn @click="showHistory = true" class="nav-btn" variant="text">
+      <v-btn to="/history" class="nav-btn" variant="text">
         <v-icon left>mdi-history</v-icon>
         History
       </v-btn>
@@ -40,60 +40,13 @@
         </v-btn>
       </div>
     </div>
-
-    <!-- Swap 對話框 -->
-    <v-dialog v-model="showSwap" width="500" class="dialog-container">
-      <v-card class="dialog-card">
-        <v-card-title class="dialog-title">
-          <span class="text-h5">
-            <v-icon left>mdi-swap-horizontal</v-icon>
-            Swap Tokens
-          </span>
-          <v-spacer></v-spacer>
-          <v-btn icon @click="showSwap = false" class="close-btn">
-            <v-icon>mdi-close</v-icon>
-          </v-btn>
-        </v-card-title>
-        <v-card-text class="pa-6">
-          <v-text-field
-            label="From"
-            variant="outlined"
-            class="mb-4"
-            hide-details
-          ></v-text-field>
-          <v-text-field
-            label="To"
-            variant="outlined"
-            hide-details
-          ></v-text-field>
-          <v-btn
-            block
-            class="swap-btn mt-6"
-            size="large"
-            elevation="2"
-          >
-            Swap Now
-          </v-btn>
-        </v-card-text>
-      </v-card>
-    </v-dialog>
-
-    <!-- History 對話框 -->
-    <v-dialog v-model="showHistory" width="800" class="dialog-container">
-      <History @close="showHistory = false" />
-    </v-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue'
-import History from '../components/History.vue'
-
-const showSwap = ref(false)
-const showHistory = ref(false)
 
 function openPiggyBank() {
-  // 實現豬豬金庫的功能
   console.log('Opening piggy bank...')
 }
 </script>
@@ -190,35 +143,6 @@ function openPiggyBank() {
 .piggy-bank-btn:hover {
   transform: scale(1.05) !important;
   box-shadow: 0 10px 20px rgba(255, 153, 153, 0.3) !important;
-}
-
-.dialog-container {
-  border-radius: 20px;
-  overflow: hidden;
-}
-
-.dialog-card {
-  border-radius: 20px !important;
-  overflow: hidden;
-}
-
-.dialog-title {
-  background: linear-gradient(45deg, #FF9999, #FFB6C1) !important;
-  color: white !important;
-  padding: 1rem 1.5rem !important;
-}
-
-.close-btn {
-  color: white !important;
-}
-
-.swap-btn {
-  background: linear-gradient(45deg, #FF9999, #FFB6C1) !important;
-  color: white !important;
-  font-size: 1.1rem !important;
-  text-transform: none !important;
-  letter-spacing: 0.5px !important;
-  border-radius: 12px !important;
 }
 
 @keyframes bounce {
