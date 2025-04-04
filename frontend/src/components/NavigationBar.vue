@@ -7,6 +7,12 @@
       </v-btn>
     </template>
     
+    <!-- Chain ID and Total Value Display -->
+    <div v-if="showWallet" class="wallet-info">
+      <span class="chain-info">Chain ID: {{ chainId }}</span>
+      <span class="value-info">${{ totalValue.toFixed(2) }}</span>
+    </div>
+    
     <!-- Spacer for flexible layout -->
     <v-spacer></v-spacer>
     
@@ -60,7 +66,7 @@
 </template>
 
 <script setup>
-import { defineProps, defineEmits } from 'vue'
+import { defineProps, defineEmits, ref, watch } from 'vue'
 import { useWalletStore } from '../store/wallet'
 import { useRouter } from 'vue-router'
 
@@ -85,10 +91,34 @@ const props = defineProps({
   showWallet: {
     type: Boolean,
     default: false
+  },
+  // Tokens data for calculating total value
+  tokens: {
+    type: Array,
+    default: () => []
   }
 })
 
 const walletStore = useWalletStore()
+const chainId = ref(137) // Chain ID for Polygon
+const totalValue = ref(0) // Total value of all tokens
+
+// Watch for changes in tokens and calculate total value
+watch(
+  () => props.tokens,
+  (newTokens) => {
+    if (newTokens && newTokens.length > 0) {
+      totalValue.value = newTokens.reduce((sum, token) => {
+        const balance = parseFloat(token.balance)
+        const price = parseFloat(token.price)
+        return sum + (balance * price)
+      }, 0)
+    } else {
+      totalValue.value = 0
+    }
+  },
+  { immediate: true }
+)
 
 // Format wallet address to show only first and last characters
 function formatAddress(address) {
@@ -152,5 +182,25 @@ const emit = defineEmits(['toggle-wallet', 'logout'])
 .wallet-btn:hover {
   background-color: rgba(255, 255, 255, 0.2) !important;
   transform: translateY(-2px);
+}
+
+.wallet-info {
+  display: flex;
+  align-items: center;
+  color: white;
+  font-weight: 500;
+  margin-left: 16px;
+}
+
+.chain-info {
+  margin-right: 12px;
+  font-size: 14px;
+}
+
+.value-info {
+  font-size: 14px;
+  background-color: rgba(255, 255, 255, 0.1);
+  padding: 4px 8px;
+  border-radius: 12px;
 }
 </style> 

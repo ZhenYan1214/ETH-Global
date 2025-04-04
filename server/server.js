@@ -3,12 +3,12 @@ require("dotenv").config();
 
 // 引入所需模組
 const express = require("express");
-const { getWalletBalances } = require("./utils/oneinch");
-const cors = require('cors');
+const { getWalletBalances, getTokenSpotPrices } = require("./utils/oneinch");
+const cors = require("cors");
 
 // 初始化 Express 應用
 const app = express();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 3010; // 注意你的日誌顯示 3011，請確認是否需要改為 3011
 
 // 添加 CORS 中間件
 app.use(cors()); // 允許所有來源的請求
@@ -29,24 +29,23 @@ app.get("/", (req, res) => {
 app.get("/wallet/balances/:chainId/:walletAddress", async (req, res) => {
   try {
     const { chainId, walletAddress } = req.params;
-    console.log(`前端請求：查詢 chainId=${chainId}, walletAddress=${walletAddress}`); // 添加日誌
-    // 調用 getWalletBalances 函數
+    console.log(`前端請求：查詢 chainId=${chainId}, walletAddress=${walletAddress}`);
     const result = await getWalletBalances(chainId, walletAddress);
-    // 返回結果
     res.status(200).json(result);
   } catch (error) {
-    console.error("前端請求失敗:", error.message); // 添加錯誤日誌
-    // 如果是 429 錯誤，仍然返回餘額資料（如果有）
-    if (error.message.includes("429")) {
-      res.status(200).json({
-        walletAddress,
-        chainId,
-        balances: [], // 如果餘額查詢也失敗，返回空陣列
-        warning: "Unable to fetch prices due to rate limit, but balances may still be available.",
-      });
-    } else {
-      res.status(500).json({ error: "無法獲取錢包餘額", details: error.message });
-    }
+    res.status(500).json({ error: "無法獲取錢包餘額", details: error.message });
+  }
+});
+
+// 查詢 token 價格的路由
+app.get("/wallet/prices/:chainId/:tokenAddresses", async (req, res) => {
+  try {
+    const { chainId, tokenAddresses } = req.params;
+    const tokenArray = tokenAddresses.split(",");
+    const result = await getTokenSpotPrices(chainId, tokenArray);
+    res.status(200).json(result);
+  } catch (error) {
+    res.status(500).json({ error: "無法獲取價格", details: error.message });
   }
 });
 
