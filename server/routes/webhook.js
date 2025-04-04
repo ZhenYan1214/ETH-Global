@@ -1,9 +1,9 @@
 const express = require('express')
 const router = express.Router()
-const verifyWebhook = require('../utils/verifyWebhook')
 
-// Apply webhook verification middleware to all routes
-router.use(verifyWebhook)
+// Remove empty middleware
+// Apply webhook verification middleware to all routes (if needed in future)
+// router.use(verifyWebhookSignature);
 
 // Handle deposit events
 router.post('/deposit', async (req, res) => {
