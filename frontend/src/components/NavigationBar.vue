@@ -2,8 +2,7 @@
   <v-app-bar class="nav-bar">
     <!-- Left side: Show back button if showBackButton prop is true -->
     <template v-if="showBackButton">
-      <v-btn :to="backRoute" class="nav-btn" variant="text">
-        <v-icon left>mdi-arrow-left</v-icon>
+      <v-btn :to="backRoute" class="nav-btn" variant="text" prepend-icon="mdi-arrow-left">
         Back
       </v-btn>
     </template>
@@ -18,23 +17,29 @@
       :to="item.route" 
       class="nav-btn" 
       variant="text"
+      :prepend-icon="item.icon"
     >
-      <v-icon left>{{ item.icon }}</v-icon>
       {{ item.title }}
     </v-btn>
     
     <!-- Right side: Show wallet if showWallet prop is true -->
     <div v-if="showWallet">
-      <v-menu v-if="walletStore.isConnected" offset-y>
-        <template v-slot:activator="{ props }">
+      <v-menu 
+        v-if="walletStore.isConnected" 
+        location="bottom end"
+        :close-on-content-click="true"
+        :scrim="false"
+        transition="scale-transition"
+      >
+        <template v-slot:activator="{ props: menuProps }">
           <v-btn 
             class="wallet-btn" 
             variant="text" 
-            v-bind="props"
+            v-bind="menuProps"
+            prepend-icon="mdi-wallet"
+            append-icon="mdi-chevron-down"
           >
-            <v-icon left>mdi-wallet</v-icon>
             {{ formatAddress(walletStore.address) }}
-            <v-icon right>mdi-chevron-down</v-icon>
           </v-btn>
         </template>
         <v-list>
@@ -42,13 +47,12 @@
             <v-list-item-title>Wallet Details</v-list-item-title>
           </v-list-item>
           <v-list-item @click="logout">
-            <v-list-item-title class="text-error">Logout</v-list-item-title>
+            <v-list-item-title color="error">Logout</v-list-item-title>
           </v-list-item>
         </v-list>
       </v-menu>
       
-      <v-btn v-else class="wallet-btn" variant="text" @click="connect">
-        <v-icon left>mdi-wallet</v-icon>
+      <v-btn v-else class="wallet-btn" variant="text" @click="connect" prepend-icon="mdi-wallet">
         Connect
       </v-btn>
     </div>

@@ -193,9 +193,9 @@ async function checkWalletTokens() {
   
   try {
     console.log('開始獲取代幣列表...')
-    console.log('API URL:', `http://localhost:3010/wallet/balances/137/${DEFAULT_WALLET_ADDRESS}`)
+    console.log('API URL:', `http://localhost:3011/wallet/balances/137/${DEFAULT_WALLET_ADDRESS}`)
     
-    const response = await axios.get(`http://localhost:3010/wallet/balances/137/${DEFAULT_WALLET_ADDRESS}`)
+    const response = await axios.get(`http://localhost:3011/wallet/balances/137/${DEFAULT_WALLET_ADDRESS}`)
     console.log('完整的 API 響應:', response)
     console.log('API 響應數據:', response.data)
     
@@ -291,13 +291,10 @@ function handleLogout() {
   background: linear-gradient(135deg, #FFF5F5 0%, #FFE0E0 100%);
 }
 
-<<<<<<< HEAD
 .nav-bar {
   background: linear-gradient(45deg, #FF9999, #FFB6C1) !important;
 }
 
-=======
->>>>>>> 563bc47b59792eb4fcd25a87f40c56da9f1ea88c
 .content-container {
   display: flex;
   justify-content: center;
