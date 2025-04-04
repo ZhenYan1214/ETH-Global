@@ -57,8 +57,8 @@ export const useWalletStore = defineStore('wallet', {
       
       try {
         // Environment variables
-        const clientKey = import.meta.env.VITE_CLIENT_KEY || 'demo-key'
-        const clientUrl = import.meta.env.VITE_CLIENT_URL || 'https://demo.circle.com/api'
+        const clientKey = import.meta.env.VITE_CLIENT_KEY
+        const clientUrl = import.meta.env.VITE_CLIENT_URL
         
     
         console.log("help")
