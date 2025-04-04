@@ -4,16 +4,21 @@ require("dotenv").config();
 // 引入所需模組
 const express = require("express");
 const { getWalletBalances } = require("./utils/oneinch"); // 修正路徑
+const cors = require('cors');
 
 // 初始化 Express 應用
 const app = express();
 const PORT = process.env.PORT || 3010;
 
+// 添加 CORS 中間件
+app.use(cors());  // 允許所有來源的請求
+
 // 中間件：解析 JSON 請求主體
 app.use(express.json());
 
-// 預設的錢包地址
+// 預設的錢包地址和鏈 ID
 const DEFAULT_WALLET_ADDRESS = "0x4EC7a00D26d392e1B29e6b7fA0199D5849A1459d";
+const DEFAULT_CHAIN_ID = "137"; // Polygon 鏈 ID
 
 // 基本路由
 app.get("/", (req, res) => {
@@ -21,19 +26,9 @@ app.get("/", (req, res) => {
 });
 
 // 查詢錢包餘額的路由
-app.get("/wallet/balances", async (req, res) => {
+app.get("/wallet/balances/:chainId/:walletAddress", async (req, res) => {
   try {
-    // 從查詢參數中獲取 chainId
-    const { chainId } = req.query;
-
-    // 驗證參數
-    if (!chainId) {
-      return res.status(400).json({ error: "chainId 是必填參數" });
-    }
-
-    // 使用預設的錢包地址
-    const walletAddress = DEFAULT_WALLET_ADDRESS;
-
+    const { chainId, walletAddress } = req.params;
     // 調用 getWalletBalances 函數
     const result = await getWalletBalances(chainId, walletAddress);
 

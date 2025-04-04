@@ -1,8 +1,19 @@
 const axios = require('axios');
+const express = require('express');
+const cors = require('cors');
+const app = express();
 
 // 1inch API 的基礎 URL 和你的 API Key
 const BASE_URL = process.env.ONEINCH_API_URL;
 const API_KEY = process.env.ONEINCH_API_KEY; // 從環境變數中獲取會更安全
+
+// 允許所有來源的請求（開發環境使用）
+app.use(cors());
+
+// 或者只允許特定來源
+app.use(cors({
+  origin: 'http://localhost:' + process.env.PORT
+}));
 
 // 獲取錢包餘額
 async function getWalletBalances(chainId, walletAddress) {
