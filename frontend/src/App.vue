@@ -1,6 +1,5 @@
 <script setup>
 import { ref } from 'vue'
-import History from './components/History.vue'
 
 const theme = {
   primary: '#FF9999', // 溫柔的粉紅色
@@ -13,7 +12,19 @@ const theme = {
 <template>
   <v-app>
     <v-main>
-      <router-view></router-view>
+      <Suspense>
+        <template #default>
+          <router-view></router-view>
+        </template>
+        <template #fallback>
+          <div class="loading-container">
+            <div class="loading-content">
+              <img src="https://em-content.zobj.net/source/microsoft-teams/363/pig-face_1f437.png" alt="Piggy Logo" class="loading-logo" />
+              <div class="loading-text">Loading...</div>
+            </div>
+          </div>
+        </template>
+      </Suspense>
     </v-main>
 
     <v-footer app :color="theme.primary" class="text-center d-flex justify-center">
@@ -38,5 +49,43 @@ const theme = {
 .footer-text {
   color: white;
   font-weight: 500;
+}
+
+/* Loading styles */
+.loading-container {
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #FFF5F5 0%, #FFE0E0 100%);
+}
+
+.loading-content {
+  text-align: center;
+}
+
+.loading-logo {
+  width: 120px;
+  height: 120px;
+  animation: bounce 2s infinite;
+}
+
+.loading-text {
+  margin-top: 20px;
+  font-size: 1.5rem;
+  color: #FF6B88;
+  font-weight: 500;
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-20px);
+  }
+  60% {
+    transform: translateY(-10px);
+  }
 }
 </style>
