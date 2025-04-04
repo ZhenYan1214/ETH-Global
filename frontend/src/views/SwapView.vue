@@ -112,6 +112,16 @@
         </v-card-title>
         <v-card-text class="pa-4">
           <v-list v-if="tokens.length > 0">
+            <!-- 添加標題行 -->
+            <v-list-item class="token-list-header">
+              <div class="d-flex w-100">
+                <div class="token-column">Token</div>
+                <div class="balance-column">餘額</div>
+                <div class="price-column">現在價格</div>
+              </div>
+            </v-list-item>
+            
+            <!-- 代幣列表項 -->
             <v-list-item
               v-for="token in tokens"
               :key="token.address"
@@ -119,9 +129,10 @@
               class="token-list-item"
               :class="{ 'selected': selectedFromToken?.address === token.address }"
             >
-              <div class="d-flex justify-space-between align-center w-100">
-                <span class="token-address">{{ token.address.substring(0, 8) }}...</span>
-                <span class="token-balance">{{ token.balance }}</span>
+              <div class="d-flex w-100">
+                <div class="token-column">{{ token.address.substring(0, 8) }}...</div>
+                <div class="balance-column">{{ token.balance }}</div>
+                <div class="price-column">${{ token.price || '0.00' }}</div>
               </div>
             </v-list-item>
           </v-list>
@@ -144,6 +155,16 @@
         </v-card-title>
         <v-card-text class="pa-4">
           <v-list v-if="tokens.length > 0">
+            <!-- 添加標題行 -->
+            <v-list-item class="token-list-header">
+              <div class="d-flex w-100">
+                <div class="token-column">Token</div>
+                <div class="balance-column">餘額</div>
+                <div class="price-column">現在價格</div>
+              </div>
+            </v-list-item>
+            
+            <!-- 代幣列表項 -->
             <v-list-item
               v-for="token in tokens"
               :key="token.address"
@@ -151,9 +172,10 @@
               class="token-list-item"
               :class="{ 'selected': selectedToToken?.address === token.address }"
             >
-              <div class="d-flex justify-space-between align-center w-100">
-                <span class="token-address">{{ token.address.substring(0, 8) }}...</span>
-                <span class="token-balance">{{ token.balance }}</span>
+              <div class="d-flex w-100">
+                <div class="token-column">{{ token.address.substring(0, 8) }}...</div>
+                <div class="balance-column">{{ token.balance }}</div>
+                <div class="price-column">${{ token.price || '0.00' }}</div>
               </div>
             </v-list-item>
           </v-list>
@@ -187,6 +209,14 @@ const selectedToToken = ref(null)
 
 const DEFAULT_WALLET_ADDRESS = "0x4EC7a00D26d392e1B29e6b7fA0199D5849A1459d"
 
+// 添加計算代幣價值的函數
+function calculateTokenValue(token) {
+  if (!token.balance || !token.price) return '0.00'
+  const value = parseFloat(token.balance) * parseFloat(token.price)
+  return value.toFixed(2)
+}
+
+// 修改 checkWalletTokens 函數來包含價格信息
 async function checkWalletTokens() {
   isLoading.value = true
   tokens.value = [] // 清空現有代幣列表
@@ -204,41 +234,91 @@ async function checkWalletTokens() {
       return
     }
 
-    if (!response.data.balances) {
-      console.error('API 響應中沒有 balances 字段:', response.data)
-      return
-    }
-
-    if (!Array.isArray(response.data.balances)) {
-      console.error('balances 不是數組:', response.data.balances)
-      return
-    }
-
-    const filteredTokens = response.data.balances.filter(token => {
-      if (!token.token || !token.balance) {
-        console.log('跳過無效的代幣數據:', token)
-        return false
+    // 處理 1inch API 返回的數據格式
+    if (typeof response.data === 'object' && !Array.isArray(response.data)) {
+      // 將對象轉換為數組格式
+      const tokenBalances = Object.entries(response.data)
+        .filter(([_, balance]) => parseFloat(balance) > 0)
+        .map(([address, balance]) => ({
+          token: address,
+          balance: balance
+        }))
+      
+      console.log('過濾後的代幣:', tokenBalances)
+      
+      if (tokenBalances.length === 0) {
+        console.log('沒有找到任何代幣')
+        return
       }
-      const balance = parseFloat(token.balance)
-      console.log(`代幣 ${token.token} 的餘額:`, balance)
-      return balance > 0
-    })
-
-    console.log('過濾後的代幣:', filteredTokens)
-
-    tokens.value = filteredTokens.map(token => {
-      const processed = {
+      
+      // 獲取代幣價格
+      const tokenPrices = await Promise.all(
+        tokenBalances.map(async token => {
+          try {
+            const priceResponse = await axios.get(`http://localhost:3011/token/price/137/${token.token}`)
+            return {
+              ...token,
+              price: priceResponse.data?.[token.token] || '0.00'
+            }
+          } catch (error) {
+            console.error(`獲取代幣 ${token.token} 價格時出錯:`, error)
+            return {
+              ...token,
+              price: '0.00'
+            }
+          }
+        })
+      )
+      
+      tokens.value = tokenPrices.map(token => ({
         address: token.token,
-        balance: parseFloat(token.balance).toFixed(4)
-      }
-      console.log('處理後的代幣數據:', processed)
-      return processed
-    })
-
-    console.log('最終的代幣列表:', tokens.value)
-    
-    if (tokens.value.length === 0) {
-      console.log('沒有找到任何代幣')
+        balance: parseFloat(token.balance).toFixed(4),
+        price: token.price
+      }))
+      
+      console.log('最終的代幣列表:', tokens.value)
+    } else if (Array.isArray(response.data.balances)) {
+      // 處理原有的數組格式
+      const filteredTokens = response.data.balances.filter(token => {
+        if (!token.token || !token.balance) {
+          console.log('跳過無效的代幣數據:', token)
+          return false
+        }
+        const balance = parseFloat(token.balance)
+        console.log(`代幣 ${token.token} 的餘額:`, balance)
+        return balance > 0
+      })
+      
+      console.log('過濾後的代幣:', filteredTokens)
+      
+      // 獲取代幣價格
+      const tokenPrices = await Promise.all(
+        filteredTokens.map(async token => {
+          try {
+            const priceResponse = await axios.get(`http://localhost:3011/token/price/137/${token.token}`)
+            return {
+              ...token,
+              price: priceResponse.data?.price || '0.00'
+            }
+          } catch (error) {
+            console.error(`獲取代幣 ${token.token} 價格時出錯:`, error)
+            return {
+              ...token,
+              price: '0.00'
+            }
+          }
+        })
+      )
+      
+      tokens.value = tokenPrices.map(token => ({
+        address: token.token,
+        balance: parseFloat(token.balance).toFixed(4),
+        price: token.price
+      }))
+      
+      console.log('最終的代幣列表:', tokens.value)
+    } else {
+      console.error('無法識別的 API 響應格式:', response.data)
     }
   } catch (error) {
     console.error('獲取代幣時出錯:', error)
@@ -353,6 +433,30 @@ function handleLogout() {
   color: white !important;
 }
 
+.token-list-header {
+  background-color: #FFF0F5 !important;
+  font-weight: 600;
+  color: #FF6B88;
+  border-bottom: 1px solid rgba(255, 107, 136, 0.2);
+}
+
+.token-column {
+  flex: 2;
+  font-family: monospace;
+  font-size: 14px;
+}
+
+.balance-column {
+  flex: 1;
+  text-align: right;
+  font-weight: 500;
+}
+
+.price-column {
+  flex: 1;
+  text-align: right;
+}
+
 .token-list-item {
   padding: 12px 16px;
   cursor: pointer;
@@ -365,15 +469,5 @@ function handleLogout() {
 
 .token-list-item.selected {
   background-color: rgba(255, 182, 193, 0.2) !important;
-}
-
-.token-address {
-  font-family: monospace;
-  font-size: 14px;
-}
-
-.token-balance {
-  color: #FF6B88;
-  font-weight: 500;
 }
 </style> 
