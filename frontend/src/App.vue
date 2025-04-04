@@ -11,28 +11,15 @@ const items = [
 <template>
   <v-app>
     <v-app-bar color="primary">
-      <v-app-bar-nav-icon @click="drawer = !drawer"></v-app-bar-nav-icon>
       <v-app-bar-title>
         <router-link to="/" class="text-decoration-none text-white">
           Piggy Vault
         </router-link>
       </v-app-bar-title>
       <v-spacer></v-spacer>
-      <v-btn to="/home" text>Home</v-btn>
       <v-btn to="/swap" text>Swap</v-btn>
+      <v-btn to="/history" text>History</v-btn>
     </v-app-bar>
-
-    <v-navigation-drawer v-model="drawer" temporary>
-      <v-list>
-        <v-list-item
-          v-for="item in items"
-          :key="item.title"
-          :to="item.to"
-          :prepend-icon="item.icon"
-          :title="item.title"
-        ></v-list-item>
-      </v-list>
-    </v-navigation-drawer>
 
     <v-main>
       <v-container>
