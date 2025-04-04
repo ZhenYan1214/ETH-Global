@@ -21,9 +21,16 @@ const NETWORK_CONFIG = {
 // Default to mainnet
 const DEFAULT_NETWORK = 'mainnet'
 
+// Port Configuration
+const PORT_CONFIG = {
+  FRONTEND_PORT: 3008,
+  SERVER_PORT: 3010
+}
+
 // Export configuration
 module.exports = {
   ...NETWORK_CONFIG[DEFAULT_NETWORK],
+  ...PORT_CONFIG,
   SUPPORTED_TOKENS: require('./tokenList'),
   DEFAULT_NETWORK,
   NETWORKS: Object.keys(NETWORK_CONFIG)
