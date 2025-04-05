@@ -19,11 +19,11 @@
     <!-- Middle/Right side navigation buttons -->
     <v-btn 
       v-for="item in navigationItems" 
-      :key="item.route" 
-      :to="item.route" 
+      :key="item.title"
       class="nav-btn" 
       variant="text"
       :prepend-icon="item.icon"
+      @click="handleItemClick(item)"
     >
       {{ item.title }}
     </v-btn>
@@ -148,7 +148,12 @@ function toggleWalletInfo() {
 }
 
 // Emit events to parent components
-const emit = defineEmits(['toggle-wallet', 'logout'])
+const emit = defineEmits(['toggle-wallet', 'logout', 'nav-click'])
+
+function handleItemClick(item) {
+  console.log('Navigation item clicked:', item)
+  emit('nav-click', item)
+}
 </script>
 
 <style scoped>
