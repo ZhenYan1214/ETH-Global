@@ -34,8 +34,8 @@
           <template v-slot:item.triggered_at="{ item }">
             {{ formatDate(item.triggered_at) }}
           </template>
-          <template v-slot:item.assets="{ item }">
-            {{ item.usdAmount.toFixed(2) }} USD
+          <template v-slot:item.usdAmount="{ item }">
+            {{ item.usdAmount ? item.usdAmount.toFixed(2) : 'N/A' }} USD
           </template>
         </v-data-table>
       </v-card-text>
@@ -56,82 +56,40 @@ const props = defineProps({
 
 const transactions = ref([]);
 const loading = ref(false);
-const ethPrice = ref(0);
-const errorMessage = ref(''); // 新增錯誤訊息
+const errorMessage = ref('');
 
-// 表格標頭
 const headers = [
   { title: '日期', key: 'triggered_at' },
   { title: '地址', key: 'sender' },
-  { title: '金額', key: 'assets' }
+  { title: '手續費', key: 'usdAmount' }
 ];
 
-// 格式化日期
 const formatDate = (dateString) => {
+  if (!dateString) return 'N/A';
   const date = new Date(dateString);
-  return date.toLocaleString('zh-TW', { timeZone: 'UTC' });
+  return isNaN(date.getTime()) ? 'Invalid Date' : date.toLocaleString('zh-TW', { timeZone: 'UTC' });
 };
 
-// 獲取 ETH 價格
-const fetchEthPrice = async () => {
-  const cachedPrice = localStorage.getItem('ethPrice');
-  const cachedTimestamp = localStorage.getItem('ethPriceTimestamp');
-  const now = Date.now();
-  const cacheDuration = 5 * 60 * 1000; // 快取 5 分鐘
-
-  if (cachedPrice && cachedTimestamp && (now - cachedTimestamp < cacheDuration)) {
-    console.log('使用快取的 ETH 價格:', cachedPrice);
-    ethPrice.value = Number(cachedPrice);
-    return;
-  }
-
-  const maxRetries = 3;
-  let attempt = 0;
-
-  while (attempt < maxRetries) {
-    try {
-      const response = await axios.get('https://api.coingecko.com/api/v3/simple/price?ids=ethereum&vs_currencies=usd');
-      ethPrice.value = response.data.ethereum.usd;
-      console.log('成功獲取 ETH 價格:', ethPrice.value);
-      localStorage.setItem('ethPrice', ethPrice.value);
-      localStorage.setItem('ethPriceTimestamp', now.toString());
-      return;
-    } catch (error) {
-      attempt++;
-      if (error.response && error.response.status === 429) {
-        console.warn(`第 ${attempt} 次嘗試失敗：429 Too Many Requests，等待重試...`);
-        if (attempt === maxRetries) {
-          console.error('超過最大重試次數，使用預設值');
-          ethPrice.value = 0;
-          return;
-        }
-        await new Promise(resolve => setTimeout(resolve, 5000 * attempt));
-      } else {
-        console.error('無法獲取 ETH 價格:', error.message);
-        ethPrice.value = 0;
-        return;
-      }
-    }
-  }
-};
-
-// 獲取交易記錄
 const fetchTransactions = async () => {
   loading.value = true;
-  errorMessage.value = ''; // 重置錯誤訊息
+  errorMessage.value = '';
   try {
-    const response = await axios.get('http://localhost:3011/api/webhook/events/bookray');
-    const rows = response.data.result.rows;
-
-    // 將 wei 轉換成 USD
+    const response = await axios.get('http://localhost:3012/api/webhook/events/bookray', {
+      timeout: 5000
+    });
+    console.log('後端原始資料:', response.data);
+    const rows = Array.isArray(response.data) ? response.data : response.data.result?.rows || [];
+    console.log('Rows 陣列:', rows);
     transactions.value = rows.map(row => {
-      const ethAmount = Number(row.assets) / 10**18; // wei 轉 ETH
-      const usdAmount = ethAmount * ethPrice.value; // ETH 轉 USD
+      // 後端已將 assets 轉換為 USD，直接使用
+      const usdAmount = row.assets && !isNaN(Number(row.assets)) ? Number(row.assets) : 0;
+      console.log('處理單筆資料:', { ...row, usdAmount });
       return {
         ...row,
         usdAmount
       };
     });
+    console.log('最終 transactions:', transactions.value);
   } catch (error) {
     console.error('無法獲取交易記錄:', error);
     errorMessage.value = '無法載入交易記錄，請稍後再試';
@@ -141,9 +99,8 @@ const fetchTransactions = async () => {
   }
 };
 
-// 當組件掛載時，獲取 ETH 價格和交易記錄
 onMounted(async () => {
-  await fetchEthPrice();
+  console.log('History.vue 組件已掛載，開始獲取資料');
   await fetchTransactions();
 });
 </script>
