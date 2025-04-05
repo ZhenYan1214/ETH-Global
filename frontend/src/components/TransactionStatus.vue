@@ -8,7 +8,9 @@
     <v-card class="rounded-lg" style="background-color: #FFF5F5;">
       <!-- 標題區 -->
       <div class="text-center pt-6 px-6">
-        <h2 class="text-2xl font-bold" style="color: #FF6B88">{{ status }}</h2>
+        <h2 class="text-2xl font-bold" :style="{ color: status === 'success' ? '#4CAF50' : (status === 'error' ? '#F44336' : '#FF6B88') }">
+          {{ status === 'pending' ? '處理中' : (status === 'success' ? '成功' : '失敗') }}
+        </h2>
         <p class="text-gray-700 text-base mt-2 mb-6">{{ message }}</p>
       </div>
 
@@ -33,7 +35,7 @@
         <div class="line-cell">
           <div class="line" :class="{ completed: step >= 2 }"></div>
           <template v-if="step === 2">
-            <img src="@/assets/load.gif" alt="Piggy" class="piggy" />
+            <img src="@/assets/load.gif" alt="Loading" class="piggy" />
           </template>
         </div>
 
@@ -77,15 +79,15 @@
 
         <!-- 標籤 -->
         <div class="label-cell" style="grid-column: 1;">
-          <div class="label">Sent ETH</div>
-          <a href="#" class="link">View transaction</a>
+          <div class="label">發送交易</div>
+          <a v-if="hash" :href="`https://polygonscan.com/tx/${hash}`" target="_blank" class="link">查看交易</a>
         </div>
         <div class="label-cell" style="grid-column: 3;">
-          <div class="label">Order Created</div>
-          <a href="#" class="link">View details</a>
+          <div class="label">交易確認</div>
+          <a v-if="hash" :href="`https://polygonscan.com/tx/${hash}`" target="_blank" class="link">查看詳情</a>
         </div>
         <div class="label-cell" style="grid-column: 5;">
-          <div class="label">Receive USDC</div>
+          <div class="label">完成存款</div>
         </div>
       </div>
 
@@ -103,9 +105,22 @@
 import { ref, watch, onMounted } from 'vue'
 
 const props = defineProps({
-  visible: Boolean,
-  status: String,
-  message: String,
+  visible: {
+    type: Boolean,
+    default: false
+  },
+  status: {
+    type: String,
+    default: 'pending' // pending, success, error
+  },
+  message: {
+    type: String,
+    default: '交易處理中，請稍候...'
+  },
+  hash: {
+    type: String,
+    default: ''
+  },
   initialStep: {
     type: Number,
     default: 1,

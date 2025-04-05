@@ -877,9 +877,48 @@ export const useTokenStore = defineStore('tokens', {
       this.toAmount = '';
       this.exchangeRate = null;
     },
-
-
-
+    
+    // 確保單選和多選模式之間的狀態同步
+    syncTokenSelectionState() {
+      // 檢查是否有單選選擇
+      if (this.selectedFromToken && !this.selectedFromTokens.some(t => 
+          t.address.toLowerCase() === this.selectedFromToken.address.toLowerCase())) {
+        // 如果單選有值，但多選沒有對應的代幣，則添加到多選中
+        this.selectedFromTokens.push({
+          ...this.selectedFromToken,
+          amount: this.fromAmount
+        });
+        console.log('已將單選代幣同步到多選模式', this.selectedFromToken);
+      }
+      
+      // 檢查多選模式
+      if (this.selectedFromTokens.length === 1 && !this.selectedFromToken) {
+        // 如果多選只有一個代幣，但單選為空，則設置單選
+        const token = this.selectedFromTokens[0];
+        this.selectedFromToken = token;
+        this.fromAmount = token.amount;
+        console.log('已將多選代幣同步到單選模式', token);
+      }
+      
+      // 如果從單選切換到多選，確保金額一致
+      if (this.selectedFromToken && this.selectedFromTokens.length > 0) {
+        const matchingToken = this.selectedFromTokens.find(t => 
+          t.address.toLowerCase() === this.selectedFromToken.address.toLowerCase());
+        
+        if (matchingToken && this.fromAmount !== matchingToken.amount) {
+          // 更新多選中的金額與單選保持一致
+          matchingToken.amount = this.fromAmount;
+          console.log('已同步代幣金額', this.fromAmount);
+        }
+      }
+      
+      return {
+        singleMode: !!this.selectedFromToken,
+        multiMode: this.selectedFromTokens.length > 0,
+        tokensCount: this.selectedFromTokens.length
+      };
+    },
+    
     // Batch fetch multiple token prices
     async batchFetchTokenPrices(addresses, chainId = 137) {
       if (!addresses || addresses.length === 0) return {};
