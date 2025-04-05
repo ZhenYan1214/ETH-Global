@@ -1,17 +1,19 @@
+<!-- App.vue -->
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useTokenStore } from './store/tokens'
+import { useRoute } from 'vue-router'
 
+const route = useRoute()
 const showModal = ref(false)
 
 const theme = {
-  primary: '#FF9999', // 溫柔的粉紅色
-  secondary: '#FFB6C1', // 淺粉紅
-  accent: '#FFC0CB', // 粉紅色
-  title: '#FF6B88', // 標題粉紅
+  primary: '#FF9999',
+  secondary: '#FFB6C1',
+  accent: '#FFC0CB',
+  title: '#FF6B88',
 }
 
-// 在應用啟動時初始化 Token Store
 onMounted(async () => {
   try {
     console.log('App mounted - initializing token store...')
@@ -25,7 +27,7 @@ onMounted(async () => {
 
 <template>
   <v-app>
-    <v-main>
+    <v-main :class="{ 'no-footer-padding': route.name === 'home' }">
       <Suspense>
         <template #default>
           <router-view></router-view>
@@ -41,13 +43,23 @@ onMounted(async () => {
       </Suspense>
     </v-main>
 
-    <v-footer app :color="theme.primary" class="text-center d-flex justify-center">
-      <span class="footer-text">&copy; {{ new Date().getFullYear() }} 🐷 Piggy Vault</span>
+    <v-footer
+      v-if="route.name !== 'home'"
+      app
+      :color="theme.primary"
+      class="text-center d-flex justify-center"
+    >
+      <span class="footer-text">© {{ new Date().getFullYear() }} 🐷 Piggy Vault</span>
     </v-footer>
   </v-app>
 </template>
 
-<style>
+<style scoped>
+.no-footer-padding {
+  padding-bottom: 0 !important; /* 移除 v-main 的 padding-bottom */
+}
+
+
 .v-application {
   font-family: 'Roboto', sans-serif;
   background: linear-gradient(135deg, #FFF5F5 0%, #FFE0E0 100%) !important;
