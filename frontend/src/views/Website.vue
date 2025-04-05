@@ -47,6 +47,15 @@
           >
             Learn More
           </v-btn>
+
+          <v-btn
+            to="/home"
+            size="x-large"
+            class="welcome-btn enter-btn"
+            elevation="4"
+          >
+            進入豬豬世界
+          </v-btn>
         </div>
       </div>
       <div class="hero-image">

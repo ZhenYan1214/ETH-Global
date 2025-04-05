@@ -830,7 +830,7 @@ export const useTokenStore = defineStore('tokens', {
       if (token) {
         this.selectedFromTokens.push({
           ...token,
-          amount: '0'
+          amount: token.balance // 使用代幣的完整餘額作為默認金額
         });
         
         this.calculateMultiTokenExchangeRate();
