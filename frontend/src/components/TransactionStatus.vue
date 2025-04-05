@@ -1,218 +1,234 @@
 <template>
-  <v-card class="status-dialog">
-    <!-- 加載動畫 -->
-    <div class="status-container pa-8" v-if="status === 'pending'">
-      <div class="animation-container">
-        <v-progress-circular
-          indeterminate
-          color="pink"
-          size="64"
-        ></v-progress-circular>
-        <span class="pig-emoji">🐷</span>
+  <v-dialog
+    :model-value="visible"
+    @update:model-value="emit('update:visible', $event)"
+    max-width="900"
+    persistent
+  >
+    <v-card class="rounded-lg" style="background-color: #FFF5F5;">
+      <!-- 標題區 -->
+      <div class="text-center pt-6 px-6">
+        <h2 class="text-2xl font-bold" style="color: #FF6B88">{{ status }}</h2>
+        <p class="text-gray-700 text-base mt-2 mb-6">{{ message }}</p>
       </div>
-      <h3 class="text-h6 mt-6 text-center">處理中...</h3>
-      <p class="text-body-2 text-center text-grey mt-2">
-        正在將您的資產存入金庫，請稍候...
-      </p>
-    </div>
 
-    <!-- 成功狀態 -->
-    <div class="status-container pa-8" v-else-if="status === 'success'">
-      <div class="animation-container">
-        <v-icon
-          color="success"
-          size="64"
-          class="success-icon"
-        >mdi-check-circle</v-icon>
-        <span class="pig-emoji happy">🐽</span>
-      </div>
-      <h3 class="text-h6 mt-6 text-center">存入成功！</h3>
-      <p class="text-body-2 text-center text-grey mt-2">
-        您的資產已經安全存入金庫
-      </p>
-      <v-btn
-        block
-        class="mt-6 close-button"
-        @click="closeDialog"
-      >
-        完成
-      </v-btn>
-    </div>
+      <!-- 進度條 -->
+      <div class="progress-grid">
+        <!-- Step 1 -->
+        <div class="circle-wrapper">
+          <div class="circle" :class="circleClass(1)">
+            <template v-if="step === 1">
+              <img src="@/assets/load.gif" class="icon-img" />
+            </template>
+            <template v-else-if="step > 1">
+              <span class="checkmark">✓</span>
+            </template>
+            <template v-else>
+              <span class="status-icon">📤</span>
+            </template>
+          </div>
+        </div>
 
-    <!-- 失敗狀態 -->
-    <div class="status-container pa-8" v-else-if="status === 'error'">
-      <div class="animation-container">
-        <v-icon
-          color="error"
-          size="64"
-          class="error-icon"
-        >mdi-alert-circle</v-icon>
-        <span class="pig-emoji sad">🐷</span>
+        <!-- 線段 1 -->
+        <div class="line-cell">
+          <div class="line" :class="{ completed: step >= 2 }"></div>
+          <template v-if="step === 2">
+            <img src="@/assets/load.gif" alt="Piggy" class="piggy" />
+          </template>
+        </div>
+
+        <!-- Step 3 -->
+        <div class="circle-wrapper">
+          <div class="circle" :class="circleClass(3)">
+            <template v-if="step === 3">
+              <img src="@/assets/load.gif" class="icon-img" />
+            </template>
+            <template v-else-if="step > 3">
+              <span class="checkmark">✓</span>
+            </template>
+            <template v-else>
+              <span class="status-icon">⏳</span>
+            </template>
+          </div>
+        </div>
+
+        <!-- 線段 2 -->
+        <div class="line-cell">
+          <div class="line" :class="{ completed: step >= 4 }"></div>
+          <template v-if="step === 4">
+            <img src="@/assets/load.gif" alt="Piggy" class="piggy" />
+          </template>
+        </div>
+
+        <!-- Step 5 -->
+        <div class="circle-wrapper">
+          <div class="circle" :class="circleClass(5)">
+            <template v-if="step === 5">
+              <img src="@/assets/load.gif" class="icon-img" />
+            </template>
+            <template v-else-if="step > 5">
+              <span class="checkmark">✓</span>
+            </template>
+            <template v-else>
+              <span class="status-icon">🏁</span>
+            </template>
+          </div>
+        </div>
+
+        <!-- 標籤 -->
+        <div class="label-cell" style="grid-column: 1;">
+          <div class="label">Sent ETH</div>
+          <a href="#" class="link">View transaction</a>
+        </div>
+        <div class="label-cell" style="grid-column: 3;">
+          <div class="label">Order Created</div>
+          <a href="#" class="link">View details</a>
+        </div>
+        <div class="label-cell" style="grid-column: 5;">
+          <div class="label">Receive USDC</div>
+        </div>
       </div>
-      <h3 class="text-h6 mt-6 text-center">存入失敗</h3>
-      <p class="text-body-2 text-center text-grey mt-2">
-        {{ errorMessage || '交易處理過程中發生錯誤' }}
-      </p>
-      <v-btn
-        block
-        class="mt-6 retry-button"
-        @click="retryTransaction"
-      >
-        重試
-      </v-btn>
-      <v-btn
-        block
-        text
-        class="mt-2"
-        @click="closeDialog"
-      >
-        關閉
-      </v-btn>
-    </div>
-  </v-card>
+
+      <!-- OK 按鈕 -->
+      <div class="text-center py-4">
+        <v-btn color="#FFB6C1" text class="px-10 text-white rounded-full" @click="close">
+          OK
+        </v-btn>
+      </div>
+    </v-card>
+  </v-dialog>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 
 const props = defineProps({
-  status: {
-    type: String,
-    default: 'pending'  // 'pending', 'success', 'error'
+  visible: Boolean,
+  status: String,
+  message: String,
+  initialStep: {
+    type: Number,
+    default: 1,
   },
-  errorMessage: {
-    type: String,
-    default: ''
-  }
 })
+const emit = defineEmits(['update:visible', 'done'])
+const step = ref(props.initialStep)
 
-const emit = defineEmits(['retry', 'close'])
-
-function closeDialog() {
-  if (props.status !== 'pending') {
-    emit('close')
+const circleClass = (targetStep) => {
+  return {
+    active: step.value === targetStep,
+    completed: step.value > targetStep,
   }
 }
 
-function retryTransaction() {
-  emit('retry')
+const close = () => {
+  console.log('TransactionStatus close called, emitting done event')
+  emit('update:visible', false)
+  emit('done')
+  step.value = 1
 }
+
+// 當視窗打開時自動開始跑步驟
+watch(
+  () => props.visible,
+  (val) => {
+    if (val) {
+      step.value = 1
+      const interval = setInterval(() => {
+        if (step.value < 5 && props.visible) {
+          step.value += 1
+        } else {
+          clearInterval(interval)
+        }
+      }, 3000) // 每 3 秒前進
+    }
+  }
+)
 </script>
 
 <style scoped>
-.status-dialog {
-  border-radius: 20px;
-  overflow: hidden;
-  background: white;
-  animation: fadeIn 0.3s ease;
-}
-
-.status-container {
-  display: flex;
-  flex-direction: column;
+.progress-grid {
+  box-sizing: border-box;
+  display: grid;
+  grid-template-columns: 96px 1fr 96px 1fr 96px;
+  grid-template-rows: 96px auto;
   align-items: center;
-  min-height: 300px;
+  justify-items: center;
+  width: 900px;
+  padding: 0 30px;
+  margin: 0 auto;
 }
-
-.animation-container {
-  position: relative;
-  width: 120px;
-  height: 120px;
+.circle-wrapper {
+  grid-row: 1;
   display: flex;
+  align-items: center;
   justify-content: center;
+}
+.circle {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background-color: white;
+  border: 8px solid #FFB6C1;
+  display: flex;
   align-items: center;
+  justify-content: center;
 }
-
-.pig-emoji {
+.circle.active {
+  border-color: #FF4081;
+}
+.circle.completed {
+  background-color: #FF4081;
+  border-color: #FF4081;
+  color: white;
+}
+.icon-img {
+  width: 72px;
+  height: auto;
+  object-fit: contain;
+}
+.status-icon,
+.checkmark {
+  font-size: 30px;
+}
+.line-cell {
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+.line {
+  width: 100%;
+  height: 4px;
+  background-color: #FFB6C1;
+}
+.line.completed {
+  background-color: #FF4081;
+}
+.piggy {
   position: absolute;
-  font-size: 48px;
-  line-height: 1;
+  width: 150px;
+  height: auto;
+  object-fit: contain;
 }
-
-.success-icon {
-  animation: popIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+.label-cell {
+  grid-row: 2;
+  text-align: center;
 }
-
-.error-icon {
-  animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+.label {
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 4px;
 }
-
-.pig-emoji.happy {
-  animation: bounce 1s infinite;
+.link {
+  font-size: 14px;
+  color: #0000ee;
+  text-decoration: none;
 }
-
-.pig-emoji.sad {
-  animation: wobble 2s infinite;
-}
-
-.close-button {
-  background: linear-gradient(135deg, #FFB6C1, #FF69B4) !important;
-  color: white !important;
-  font-weight: 600;
-  border-radius: 12px;
-}
-
-.retry-button {
-  background: linear-gradient(135deg, #FFB6C1, #FF69B4) !important;
-  color: white !important;
-  font-weight: 600;
-  border-radius: 12px;
-}
-
-@keyframes popIn {
-  0% {
-    transform: scale(0);
-  }
-  70% {
-    transform: scale(1.2);
-  }
-  100% {
-    transform: scale(1);
-  }
-}
-
-@keyframes shake {
-  0%, 100% {
-    transform: translateX(0);
-  }
-  20%, 60% {
-    transform: translateX(-5px);
-  }
-  40%, 80% {
-    transform: translateX(5px);
-  }
-}
-
-@keyframes bounce {
-  0%, 100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-10px);
-  }
-}
-
-@keyframes wobble {
-  0%, 100% {
-    transform: rotate(0);
-  }
-  25% {
-    transform: rotate(-5deg);
-  }
-  75% {
-    transform: rotate(5deg);
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(-20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.link:hover {
+  text-decoration: underline;
 }
 </style>
-  
