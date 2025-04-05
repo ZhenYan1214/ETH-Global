@@ -21,7 +21,6 @@
           <v-icon class="nav-icon">mdi-history</v-icon>
           History
         </v-btn>
-        
       </div>
     </v-app-bar>
 
@@ -43,16 +42,12 @@
           </v-btn>
         </div>
       </div>
-      <div class="piggy-section">
-        <div class="piggy-container">
-          <img src="@/assets/homePig.gif" alt="Piggy Main" class="piggy-gif" />
-          <div class="ground-shadow"></div>
-        </div>
-      </div>
     </div>
 
-    <!-- 背景圖片 -->
-    <div class="background-image"></div>
+    <!-- 場景容器 -->
+    <div class="scene-container">
+      <img src="@/assets/newPig.gif" alt="Piggy Scene" class="scene-image" />
+    </div>
 
     <!-- 頁腳 -->
     <footer class="footer">
@@ -69,32 +64,52 @@
       </div>
     </footer>
 
-    <!-- 反饋按鈕 -->
-    <v-btn class="feedback-btn" fab @click="openFeedback">
+    <!-- 其他對話框和按鈕 -->
+    <v-btn class="feedback-btn" icon elevation="0" @click="openFeedbackModal">
       <v-icon>mdi-message-outline</v-icon>
     </v-btn>
 
-    <!-- 反饋對話框 -->
-    <v-dialog v-model="showFeedback" max-width="480">
-      <v-card class="feedback-dialog">
-        <v-card-title class="feedback-title">
-          We'd Love Your Feedback!
-        </v-card-title>
-        <v-card-text>
-          <v-btn
-            v-for="(option, index) in feedbackOptions"
-            :key="index"
-            class="feedback-option"
-            block
-            @click="submitFeedback(option)"
-          >
-            {{ option }}
-          </v-btn>
-        </v-card-text>
-      </v-card>
-    </v-dialog>
+    <!-- Feedback Modal -->
+    <div v-if="showFeedbackModal" class="feedback-modal">
+      <div class="feedback-content">
+        <div v-if="!showThankYou && !showCommentInput" class="modal-header">
+          <h3>Help Us Make Piggy Vault Better! 🐷</h3>
+          <p class="modal-description">Your feedback is important to us. Please share your thoughts!</p>
+        </div>
 
-    <!-- 保留原有的 History 對話框 -->
+        <div v-if="!showThankYou && !showCommentInput" class="feedback-options">
+          <button class="feedback-option" @click="submitFeedback('like')">
+            <span class="option-icon">👍</span>
+            <span class="option-text">I Like It</span>
+          </button>
+          <button class="feedback-option" @click="submitFeedback('dislike')">
+            <span class="option-icon">👎</span>
+            <span class="option-text">I Don't Like It</span>
+          </button>
+          <button class="feedback-option" @click="showCommentForm">
+            <span class="option-icon">💭</span>
+            <span class="option-text">I Want to Say Something</span>
+          </button>
+        </div>
+
+        <div v-if="showCommentInput" class="comment-section">
+          <textarea
+            v-model="feedbackText"
+            class="feedback-textarea"
+            placeholder="Tell us what you think..."
+          ></textarea>
+          <button class="submit-btn" @click="submitComment">Submit</button>
+        </div>
+
+        <div v-if="showThankYou" class="thank-you-message">
+          <div class="thank-you-icon">{{ thankYouIcon }}</div>
+          <p>{{ thankYouText }}</p>
+        </div>
+
+        <button class="close-modal" @click="closeFeedbackModal">&times;</button>
+      </div>
+    </div>
+
     <History :show="showHistory" @update:show="showHistory = $event" />
     
     <!-- 添加 4626list 對話框 -->
@@ -113,7 +128,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import History from '../components/History.vue'
 import TokenList4626 from '../components/4626list.vue'
 import Withdraw from '../components/withdraw.vue'
@@ -124,16 +139,26 @@ const walletStore = useWalletStore()
 const router = useRouter()
 const showHistory = ref(false)
 const showWalletInfo = ref(false)
-const showFeedback = ref(false)
+const showFeedbackModal = ref(false)
 const show4626List = ref(false)
 const showWithdraw = ref(false)
 const vaultBalance = ref('0.00')
+const showThankYou = ref(false)
+const showCommentInput = ref(false)
+const feedbackText = ref('')
+const thankYouIcon = ref('')
+const thankYouText = ref('')
 
 const feedbackOptions = [
-  'I Like Something',
-  'I Don\'t Like Something',
-  'I Have an Idea'
+  { type: 'like', emoji: '👍', text: 'I Like Something' },
+  { type: 'dislike', emoji: '👎', text: 'I Don\'t Like Something' },
+  { type: 'idea', emoji: '💡', text: 'I Have an Idea' },
+  { type: 'bug', emoji: '🐛', text: 'I Found a Bug' }
 ]
+
+const canSubmit = computed(() => {
+  return selectedOption.value && feedbackText.value.trim().length > 0
+})
 
 async function updateVaultBalance() {
   if (walletStore.isConnected) {
@@ -180,13 +205,53 @@ function handleNavClick(item) {
   }
 }
 
-function openFeedback() {
-  showFeedback.value = true
+// Feedback modal functions
+const openFeedbackModal = () => {
+  showFeedbackModal.value = true
+  showThankYou.value = false
+  showCommentInput.value = false
+  feedbackText.value = ''
 }
 
-function submitFeedback(option) {
-  console.log('Feedback submitted:', option)
-  showFeedback.value = false
+const closeFeedbackModal = () => {
+  showFeedbackModal.value = false
+  showThankYou.value = false
+  showCommentInput.value = false
+  feedbackText.value = ''
+}
+
+const showCommentForm = () => {
+  showCommentInput.value = true
+}
+
+const submitFeedback = (type) => {
+  if (type === 'like') {
+    thankYouIcon.value = '🥰'
+    thankYouText.value = 'Your like is our motivation, thank you!'
+  } else if (type === 'dislike') {
+    thankYouIcon.value = '🙏'
+    thankYouText.value = 'Thank you for your valuable feedback!'
+  }
+  showThankYou.value = true
+  
+  // 這裡可以加入發送反饋到後端的邏輯
+  setTimeout(() => {
+    closeFeedbackModal()
+  }, 1000)
+}
+
+const submitComment = () => {
+  if (feedbackText.value.trim()) {
+    thankYouIcon.value = '🙏'
+    thankYouText.value = 'Thank you for your valuable feedback!'
+    showThankYou.value = true
+    showCommentInput.value = false
+    
+    // 這裡可以加入發送反饋到後端的邏輯
+    setTimeout(() => {
+      closeFeedbackModal()
+    }, 1000)
+  }
 }
 
 function handleTokenSelect(token) {
@@ -222,8 +287,6 @@ function createParticles() {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  margin: 0;
-  padding: 0;
 }
 
 .background-decoration {
@@ -327,38 +390,37 @@ function createParticles() {
 }
 
 .main-content {
+  position: relative;
+  z-index: 2;
+  padding: 15px;
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: space-between;
-  padding: 20px;
-  position: relative;
-  z-index: 10;
-  max-height: calc(100vh - 90px); /* 調整 max-height，考慮頁腳高度 */
-  
-  /* 調整 max-height，考慮頁腳高度 就是幹的這行在搞*/
+  min-height: 0; 
 }
 
 .content-card {
   width: 100%;
-  max-width: 1200px;
+  max-width: 960px;
   background: rgba(255, 255, 255, 0.6);
-  border-radius: 32px;
-  padding: 40px;
+  border-radius: 24px;
+  padding: 20px;
   text-align: center;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
   border: 1px solid rgba(255, 255, 255, 0.2);
+  transform: scale(0.9);
+  margin-top: -20px;
 }
 
 .main-title {
   font-family: 'Poppins', sans-serif;
   font-weight: 700;
-  font-size: 42px;
+  font-size: 33px;
   color: #2D2D2D;
-  margin-bottom: 16px;
+  margin-bottom: 14px;
 }
 
 .highlight {
@@ -368,38 +430,37 @@ function createParticles() {
 }
 
 .balance-amount {
-  font-size: 3.5rem;
+  font-size: 2.7rem;
   color: #FF6B88;
   font-weight: 700;
-  margin: 1rem 0;
   display: block;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .sub-title {
-  font-size: 1.4rem;
+  font-size: 1.26rem;
   color: #2D2D2D;
-  margin-bottom: 24px;
+  margin-bottom: 22px;
   font-weight: 500;
 }
 
 .buttons-container {
   display: flex;
   justify-content: center;
-  gap: 40px; /* 按鈕之間的間距 */
-  margin-top: 20px;
+  gap: 36px;
+  margin-top: 18px;
 }
 
 .start-deposit-btn {
-  width: 320px !important;
-  height: 72px !important;
+  width: 288px !important;
+  height: 65px !important;
+  font-size: 25px !important;
   font-weight: 700 !important;
-  font-size: 28px !important;
   color: white !important;
   background: linear-gradient(45deg, #FF6F91, #FF8DA1) !important;
   border-radius: 36px !important;
   transition: all 0.3s ease !important;
-  margin-right: 20px; /* 向左移動 */
+  margin-right: 20px;
 }
 
 .start-deposit-btn:hover {
@@ -408,15 +469,15 @@ function createParticles() {
 }
 
 .start-Withdrawals-btn {
-  width: 320px !important;
-  height: 72px !important;
+  width: 288px !important;
+  height: 65px !important;
+  font-size: 25px !important;
   font-weight: 700 !important;
-  font-size: 28px !important;
   color: white !important;
   background: linear-gradient(45deg, #f4305e, #FF8DA1) !important;
   border-radius: 36px !important;
   transition: all 0.3s ease !important;
-  margin-left: 20px; /* 向右移動 */
+  margin-left: 20px;
 }
 
 .start-Withdrawals-btn:hover {
@@ -429,19 +490,17 @@ function createParticles() {
   position: relative;
   display: flex;
   justify-content: center;
-  margin-top: -10px; /* 將豬向上移動20px */
+  margin-top: -10px;
 }
 
 .piggy-container {
   position: relative;
-  
 }
 
 .piggy-gif {
   width: 240px;
   height: 240px;
   filter: drop-shadow(0 2px 4px rgba(255, 111, 145, 0.2));
-  
 }
 
 .ground-shadow {
@@ -456,15 +515,16 @@ function createParticles() {
 .footer {
   height: 60px;
   background: #FF8DA1;
-  padding: 10px 0;
-  position: relative;
   width: 100%;
-  z-index: 10;
+  z-index: 2;
   display: flex;
   justify-content: center;
   align-items: center;
-  margin: 0; /* 確保沒有多餘 margin */
-  flex-grow: 1; 
+  margin: 0;
+  padding: 0;
+  position: fixed;
+  bottom: 0;
+  left: 0;
 }
 
 .social-icons {
@@ -481,9 +541,18 @@ function createParticles() {
   position: fixed !important;
   bottom: 80px !important;
   right: 40px !important;
-  background: linear-gradient(45deg, #FF6F91, #FF8DA1) !important;
+  background: rgba(255, 255, 255, 0.2) !important;
   color: white !important;
   z-index: 100 !important;
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 50% !important;
+  transition: all 0.3s ease !important;
+}
+
+.feedback-btn:hover {
+  background: rgba(255, 255, 255, 0.3) !important;
+  transform: translateY(-2px);
 }
 
 @keyframes bounce {
@@ -495,16 +564,196 @@ function createParticles() {
   }
 }
 
-.background-image {
-  position: absolute;
-  bottom: 60px; /* 與頁腳高度對齊 */
+.scene-container {
+  position: fixed;
+  bottom: 60px;
+  left: 0;
+  width: 100vw;
+  height: calc(100vh - 60px);
+  z-index: 1;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  margin: 0;
+  padding: 0;
+}
+
+.scene-image {
+  width: 100vw;
+  height: auto;
+  object-fit: contain;
+  max-height: calc(100vh - 60px);
+  margin: 0;
+  padding: 0;
+  display: block;
+}
+
+.feedback-modal {
+  position: fixed;
+  top: 0;
   left: 0;
   width: 100%;
-  height: 200px;
-  background-image: url('@/assets/BG1.webp');
-  background-repeat: no-repeat;
-  background-position: bottom center;
-  background-size: cover;
-  z-index: 1;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1001;
+}
+
+.feedback-content {
+  background: white;
+  padding: 32px;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 400px;
+  position: relative;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.modal-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.modal-header h3 {
+  font-size: 24px;
+  color: #2D2D2D;
+  margin-bottom: 8px;
+}
+
+.modal-header .modal-description {
+  color: #666;
+  font-size: 16px;
+}
+
+.feedback-options {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.feedback-option {
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  background: #F8F9FA;
+  border: 1px solid #E9ECEF;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.feedback-option:hover {
+  background: #FFF5F7;
+  border-color: #FF6F91;
+  transform: translateY(-2px);
+}
+
+.option-icon {
+  font-size: 24px;
+  margin-right: 12px;
+}
+
+.option-text {
+  font-size: 16px;
+  color: #2D2D2D;
+}
+
+.close-modal {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: none;
+  background: #F8F9FA;
+  color: #666;
+  font-size: 20px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.close-modal:hover {
+  background: #FFF5F7;
+  color: #FF6F91;
+}
+
+.comment-section {
+  margin-top: 20px;
+}
+
+.feedback-textarea {
+  width: 100%;
+  height: 120px;
+  padding: 12px;
+  border: 1px solid #E9ECEF;
+  border-radius: 12px;
+  resize: none;
+  font-size: 16px;
+  margin-bottom: 16px;
+  transition: border-color 0.3s ease;
+}
+
+.feedback-textarea:focus {
+  outline: none;
+  border-color: #FF6F91;
+}
+
+.submit-btn {
+  width: 100%;
+  padding: 12px;
+  background: #FF6F91;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.submit-btn:hover {
+  background: #FF8DA1;
+  transform: translateY(-2px);
+}
+
+.thank-you-message {
+  text-align: center;
+  padding: 20px;
+}
+
+.thank-you-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.thank-you-message p {
+  font-size: 18px;
+  color: #2D2D2D;
+  line-height: 1.5;
+}
+
+@media (max-width: 480px) {
+  .feedback-content {
+    width: 95%;
+    padding: 24px;
+    margin: 10px;
+  }
+
+  .modal-header h3 {
+    font-size: 20px;
+  }
+
+  .modal-header .modal-description {
+    font-size: 14px;
+  }
+
+  .feedback-option {
+    padding: 12px;
+  }
 }
 </style>
