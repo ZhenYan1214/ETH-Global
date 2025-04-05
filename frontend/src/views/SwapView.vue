@@ -69,25 +69,36 @@
                   </div>
                 </div>
 
-            <!-- Multi-Select Mode -->
-            <div v-else class="token-grid">
-              <v-row>
-                <v-col v-for="token in tokenStore.selectedFromTokens" :key="token.address" cols="12">
-                  <token-card 
-                    :token="token" 
-                    @max="setMaxAmount(token.address)" 
-                    @remove="tokenStore.toggleFromToken(token.address)"
-                    @amount-change="updateFromTokenAmount(token.address, $event)" 
-                  />
-                </v-col>
-              </v-row>
-              
-              <!-- Total Value Display -->
-              <div class="total-value-container mt-4 pa-3">
-                <span class="text-subtitle-2">Total Value</span>
-                <span class="text-h6 font-weight-bold text-primary">${{ formatPrice(tokenStore.totalFromAmount) }}</span>
-          </div>
-            </div>
+                <!-- Multi-Select Mode -->
+                <div v-else class="token-grid">
+                  <div class="selected-tokens-scroll"
+                    style="max-height: 250px; overflow-y: auto;"
+                  >
+                    <v-row>
+                      <v-col
+                        v-for="token in tokenStore.selectedFromTokens"
+                        :key="token.address"
+                        cols="12"
+                      >
+                        <!-- 如果 token-card 沒有子元素，可以自閉合 -->
+                        <token-card
+                          :token="token"
+                          @max="setMaxAmount(token.address)"
+                          @remove="tokenStore.toggleFromToken(token.address)"
+                          @amount-change="updateFromTokenAmount(token.address, $event)"
+                        />
+                      </v-col>
+                    </v-row>
+                  </div>
+
+                  <!-- Total Value Display -->
+                  <div class="total-value-container mt-4 pa-3">
+                    <span class="text-subtitle-2">Total Value</span>
+                    <span class="text-h6 font-weight-bold text-primary">
+                      ${{ formatPrice(tokenStore.totalFromAmount) }}
+                    </span>
+                  </div>
+                </div>
           </section>
 
             <!-- Swap Arrow -->
@@ -197,46 +208,58 @@
           <div class="mt-2">No matching tokens</div>
         </v-card-text>
 
-        <v-card-text v-else class="pa-0">
-          <v-list class="token-list py-0">
-            <v-list-item
-              v-for="token in filteredFromTokens"
-              :key="token.address"
-              class="token-list-item"
-              :class="{'selected-token': tokenStore.isTokenSelected(token.address)}"
-              @click="selectTokenWithFullAmount(token.address)"
-            >
-              <template v-slot:prepend>
-                <v-checkbox
-                  :model-value="tokenStore.isTokenSelected(token.address)"
-                  @click.stop
-                  @change="selectTokenWithFullAmount(token.address)"
-                  density="compact"
-                  hide-details
-                  color="primary"
-                ></v-checkbox>
-                <v-avatar size="32" class="ml-2">
-                  <v-img :src="getTokenLogo(token.address)" @error="handleImageError" />
-                </v-avatar>
-              </template>
-              
-              <v-list-item-title class="font-weight-medium">
-                {{ getTokenSymbol(token.address) }}
-              </v-list-item-title>
-              
-              <v-list-item-subtitle class="text-truncate">
-                {{ getTokenName(token.address) }}
-              </v-list-item-subtitle>
-              
-              <template v-slot:append>
-                <div class="d-flex flex-column align-end">
-                  <span class="text-body-2">{{ getFormattedBalance(token) }}</span>
-                  <span v-if="token.price" class="text-caption text-grey">{{ getFormattedPrice(token) }}</span>
-                </div>
-              </template>
-            </v-list-item>
-          </v-list>
+        <v-card-text
+          v-else
+          class="pa-0"
+        >
+          <div
+            class="token-scroll-wrapper"
+            :style="{
+              maxHeight: '400px',
+              overflowY: 'auto'
+            }"
+          >
+            <v-list class="py-0">
+              <v-list-item
+                v-for="token in filteredFromTokens"
+                :key="token.address"
+                class="token-list-item"
+                :class="{ 'selected-token': tokenStore.isTokenSelected(token.address) }"
+                @click="selectTokenWithFullAmount(token.address)"
+              >
+                <template v-slot:prepend>
+                  <v-checkbox
+                    :model-value="tokenStore.isTokenSelected(token.address)"
+                    @click.stop
+                    @change="selectTokenWithFullAmount(token.address)"
+                    density="compact"
+                    hide-details
+                    color="primary"
+                  />
+                  <v-avatar size="32" class="ml-2">
+                    <v-img :src="getTokenLogo(token.address)" @error="handleImageError" />
+                  </v-avatar>
+                </template>
+
+                <v-list-item-title class="font-weight-medium">
+                  {{ getTokenSymbol(token.address) }}
+                </v-list-item-title>
+
+                <v-list-item-subtitle class="text-truncate">
+                  {{ getTokenName(token.address) }}
+                </v-list-item-subtitle>
+
+                <template v-slot:append>
+                  <div class="d-flex flex-column align-end">
+                    <span class="text-body-2">{{ getFormattedBalance(token) }}</span>
+                    <span v-if="token.price" class="text-caption text-grey">{{ getFormattedPrice(token) }}</span>
+                  </div>
+                </template>
+              </v-list-item>
+            </v-list>
+          </div>
         </v-card-text>
+
       </v-card>
     </v-dialog>
 
