@@ -5,10 +5,10 @@ By integrating smart contracts with DeFi protocols, users can easily deposit var
 
 ## 🌟 Main functions
 
-💰 Multi-Token Support: Supports major stablecoins such as USDC, DAI, and USDT
-🔄 One-Click Swap: Utilizes 1inch Portal API for swap commands and packages transactions via Circle API to provide the most optimal swap route
-💸 Auto Yield Generation: Integrates ERC-4626 and Yearn for automated asset management and yield generation
-📊 Real-Time Monitoring: Integrates MultiBaas to enable real-time event monitoring
+- 💰 Multi-Token Support: Supports major stablecoins such as USDC, DAI, and USDT
+- 🔄 One-Click Swap: Utilizes 1inch Portal API for swap commands and packages transactions via Circle API to provide the most optimal swap route
+- 💸 Auto Yield Generation: Integrates ERC-4626 and Yearn for automated asset management and yield generation
+- 📊 Real-Time Monitoring: Integrates MultiBaas to enable real-time event monitoring
 
 ## 🛠 Tech Stack
 
