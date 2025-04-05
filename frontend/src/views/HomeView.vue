@@ -6,6 +6,7 @@
       :showWallet="true"
       @toggle-wallet="showWalletInfo = !showWalletInfo"
       @logout="handleLogout"
+      @nav-click="handleNavClick"
     />
 
     <!-- 主要內容 -->
@@ -35,20 +36,32 @@
         </v-btn>
       </div>
     </div>
+
+    <!-- 添加一個測試按鈕 -->
+    <v-btn @click="showHistory = true">
+      Test History Dialog
+    </v-btn>
+
+    <!-- 歷史記錄對話框 -->
+    <History :show="showHistory" @update:show="showHistory = $event" />
   </div>
 </template>
 
 <script setup>
 import { ref } from 'vue'
 import NavigationBar from '../components/NavigationBar.vue'
+import History from '../components/History.vue'
 import { useWalletStore } from '../store/wallet'
+import { useRouter } from 'vue-router'
 
 const walletStore = useWalletStore()
+const router = useRouter()
+const showHistory = ref(false)
 
 // Navigation items for the navigation bar
 const navigationItems = [
   { icon: 'mdi-swap-horizontal', title: 'Swap', route: '/swap' },
-  { icon: 'mdi-history', title: 'History', route: '/history' }
+  { icon: 'mdi-history', title: 'History', action: 'history' }
 ]
 
 const showWalletInfo = ref(false)
@@ -61,6 +74,16 @@ function handleLogout() {
   console.log('User logged out')
   showWalletInfo.value = false
   // Handle any additional cleanup needed after logout
+}
+
+function handleNavClick(item) {
+  console.log('handleNavClick called with:', item)
+  if (item.action === 'history') {
+    console.log('Setting showHistory to true')
+    showHistory.value = true
+  } else if (item.route) {
+    router.push(item.route)
+  }
 }
 </script>
 
