@@ -1,10 +1,10 @@
 <template>
   <div>
-    <!-- 4626list 對話框 -->
+    <!-- Token Selection Dialog -->
     <v-dialog :model-value="modelValue" @update:model-value="$emit('update:modelValue', $event)" max-width="600" scrollable>
       <v-card class="token-dialog">
         <v-toolbar color="primary" density="compact">
-          <v-toolbar-title class="text-white">選擇代幣 (多選)</v-toolbar-title>
+          <v-toolbar-title class="text-white">Select Tokens (Multi)</v-toolbar-title>
           <v-spacer></v-spacer>
           <v-btn 
             v-if="tokenStore.selectedFromTokens.length > 0"
@@ -20,11 +20,11 @@
           </v-btn>
         </v-toolbar>
         
-        <!-- 搜索欄位 -->
+        <!-- Search Field -->
         <div class="pa-3">
           <v-text-field
             v-model="searchText"
-            label="搜尋代幣"
+            label="Search tokens"
             variant="outlined"
             density="compact"
             prepend-inner-icon="mdi-magnify"
@@ -33,20 +33,20 @@
           ></v-text-field>
         </div>
         
-        <!-- 載入中狀態 -->
+        <!-- Loading State -->
         <v-card-text v-if="tokenStore.isLoading" class="text-center pa-4">
           <v-progress-circular indeterminate color="primary"></v-progress-circular>
-          <div class="mt-2">載入中...</div>
+          <div class="mt-2">Loading...</div>
         </v-card-text>
 
-        <!-- 無結果狀態 -->
+        <!-- No Results State -->
         <v-card-text v-else-if="filteredTokens.length === 0" class="text-center pa-4">
           <v-icon size="large" color="grey-lighten-1">mdi-alert-circle-outline</v-icon>
-          <div class="mt-2">您的錢包中沒有代幣</div>
-          <div class="text-caption text-grey mt-1">請連接錢包或添加代幣</div>
+          <div class="mt-2">No tokens found</div>
+          <div class="text-caption text-grey mt-1">Connect wallet or add tokens</div>
         </v-card-text>
 
-        <!-- 代幣列表 -->
+        <!-- Token List -->
         <v-card-text v-else class="token-list-container pa-0">
           <v-list class="token-list py-0">
             <v-list-item
@@ -88,18 +88,18 @@
           </v-list>
         </v-card-text>
 
-        <!-- 底部區域 -->
+        <!-- Footer Area -->
         <div class="token-dialog-footer">
-          <!-- 總資產價值 -->
+          <!-- Total Value -->
           <v-divider></v-divider>
           <div class="total-value-container px-4 py-3">
             <div class="d-flex justify-space-between align-center">
-              <span class="text-subtitle-1">總價值:</span>
+              <span class="text-subtitle-1">Total Value:</span>
               <span class="text-h6 font-weight-bold text-primary">${{ getTotalValue }}</span>
             </div>
           </div>
 
-          <!-- 金庫按鈕 -->
+          <!-- Vault Button -->
           <div class="vault-button-container px-4 pb-4">
             <v-btn
               class="vault-button"
@@ -110,30 +110,29 @@
               :class="{'vault-button-disabled': !hasSelectedTokens}"
               @click="goToVault"
             >
-              <span class="vault-button-text">✨ 金庫我來了 ✨</span>
+              <span class="vault-button-text">✨ Enter Vault ✨</span>
             </v-btn>
             
-            <!-- 添加提示信息 -->
+            <!-- Hint Messages -->
             <div v-if="!hasSelectedTokens" class="selection-hint mt-2 text-center">
               <v-icon color="warning" size="small" class="mr-1">mdi-information</v-icon>
-              <span class="text-caption">請先選擇至少一個代幣</span>
+              <span class="text-caption">Select at least one token</span>
             </div>
             <div v-else-if="hasInvalidAmounts" class="selection-hint mt-2 text-center">
               <v-icon color="warning" size="small" class="mr-1">mdi-cash-alert</v-icon>
-              <span class="text-caption">有代幣金額為0，請確認金額</span>
+              <span class="text-caption">Some tokens have zero amount</span>
             </div>
           </div>
         </div>
       </v-card>
     </v-dialog>
 
-    <!-- Allowance 對話框 -->
+    <!-- Additional Dialogs -->
     <Allowance 
       v-model="showAllowanceDialog"
       @showTransactionStatus="handleShowTransactionStatus"
     />
 
-    <!-- TransactionStatus 對話框 -->
     <TransactionStatus
       v-model:visible="showTransactionStatusDialog"
       :status="transactionStatus"
@@ -143,7 +142,6 @@
       @done="handleTransactionDone"
     />
 
-    <!-- Finish 對話框 -->
     <Finish 
       v-model:show="showFinishDialog" 
       :to-amount="receivedAmount"
@@ -181,31 +179,31 @@ const showAllowanceDialog = ref(false)
 const showTransactionStatusDialog = ref(false)
 const showFinishDialog = ref(false)
 const transactionStatus = ref('pending')
-const transactionMessage = ref('交易處理中，請稍候...')
+const transactionMessage = ref('Transaction processing, please wait...')
 const transactionHash = ref('')
 const transactionReceipt = ref(null)
 const receivedAmount = ref('0')
 const errorMessage = ref('')
 const vaultStore = useVaultStore()
 
-// 聲明在資料區域的頂部
+// Store subscriptions
 let vaultStoreSubscription = null
 
-// 監聽對話框顯示狀態
+// Watch dialog display status
 watch(() => props.modelValue, async (newValue) => {
   if (newValue && walletStore.isConnected) {
-    // 當對話框打開時，重新獲取用戶錢包中的代幣
+    // Fetch user's wallet tokens when dialog opens
     await tokenStore.fetchTokens()
   }
 })
 
-// 過濾代幣列表 - 只顯示有餘額的代幣
+// Filter token list - only show tokens with balance
 const filteredTokens = computed(() => {
   if (!tokenStore.tokens) return []
   
   const search = searchText.value.toLowerCase()
   return tokenStore.tokens.filter(token => {
-    // 確保代幣有餘額且不為0
+    // Ensure token has non-zero balance
     if (!token.balance || token.balance === '0' || parseFloat(token.balance) === 0) return false
     
     const symbol = getTokenSymbol(token.address).toLowerCase()
@@ -218,7 +216,7 @@ const filteredTokens = computed(() => {
   })
 })
 
-// 計算總資產價值
+// Calculate total asset value
 const getTotalValue = computed(() => {
   if (!tokenStore.tokens) return '0.00'
   
@@ -234,12 +232,12 @@ const getTotalValue = computed(() => {
   })
 })
 
-// 檢查是否有選擇代幣
+// Check if tokens are selected
 const hasSelectedTokens = computed(() => {
   return tokenStore.selectedFromTokens && tokenStore.selectedFromTokens.length > 0;
 });
 
-// 檢查選擇的代幣中是否有無效金額
+// Check for invalid amounts in selected tokens
 const hasInvalidAmounts = computed(() => {
   if (!hasSelectedTokens.value) return false;
   
@@ -420,7 +418,7 @@ function handleShowTransactionStatus() {
     console.log('[4626list] 顯示交易狀態')
     showTransactionStatusDialog.value = true
     transactionStatus.value = 'pending'
-    transactionMessage.value = '交易處理中，請稍候...'
+    transactionMessage.value = 'Transaction processing, please wait...'
     transactionHash.value = ''
     transactionReceipt.value = null
     
@@ -451,13 +449,13 @@ function handleShowTransactionStatus() {
           if (state.depositStatus === 'processing' && state.transactionHash) {
             console.log('[4626list] 交易處理中...')
             transactionStatus.value = 'pending'
-            transactionMessage.value = '交易已提交，等待確認...'
+            transactionMessage.value = 'Transaction submitted, waiting for confirmation...'
             transactionHash.value = state.transactionHash
           } 
           else if (state.depositStatus === 'success') {
             console.log('[4626list] 交易成功!')
             transactionStatus.value = 'success'
-            transactionMessage.value = '交易已確認！'
+            transactionMessage.value = 'Transaction confirmed!'
             
             // 只有在收到收據後才設置 receipt
             if (state.depositReceipt) {
@@ -482,7 +480,7 @@ function handleShowTransactionStatus() {
           else if (state.depositStatus === 'error') {
             console.log('[4626list] 交易失敗:', state.error)
             transactionStatus.value = 'error'
-            transactionMessage.value = `交易失敗: ${state.error || '未知錯誤'}`
+            transactionMessage.value = `Transaction failed: ${state.error || 'Unknown error'}`
           }
         } catch (subscribeError) {
           console.error('[4626list] 訂閱回調中發生錯誤:', subscribeError)
@@ -529,7 +527,7 @@ function handleTransactionDone() {
     
     // 重置交易相關狀態
     transactionStatus.value = 'pending'
-    transactionMessage.value = '交易處理中，請稍候...'
+    transactionMessage.value = 'Transaction processing, please wait...'
     transactionHash.value = ''
     transactionReceipt.value = null
     
