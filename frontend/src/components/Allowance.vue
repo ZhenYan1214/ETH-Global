@@ -100,15 +100,12 @@
       @done="openFinish"
     />
 
-    <Finish 
-      v-model="showFinish" 
-      @close="handleFinishClose"
-    />
+    <Finish v-if="showFinish" @close="showFinish = false" />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import TransactionStatus from './TransactionStatus.vue'
 import Finish from './Finish.vue'
 
@@ -179,18 +176,6 @@ const openFinish = () => {
   showFinish.value = true
   console.log('showFinish value:', showFinish.value)
 }
-
-const handleFinishClose = () => {
-  showFinish.value = false
-  emit('update:modelValue', false) // Close the Allowance dialog as well
-}
-
-// Add watch for showFinish to ensure proper cleanup
-watch(showFinish, (newValue) => {
-  if (newValue) {
-    showTransactionStatus.value = false
-  }
-})
 </script>
 
 <style scoped>
