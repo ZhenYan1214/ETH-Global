@@ -166,15 +166,6 @@
       </div>
     </div>
 
-    <!-- Footer -->
-    <footer class="footer">
-      <div class="social-icons">
-        <a v-for="(icon, index) in socialIcons" :key="index" :href="icon.href">
-          <v-icon :icon="icon.icon" />
-        </a>
-      </div>
-      <p class="copyright">© 2025 Piggy Vault. All rights reserved.</p>
-    </footer>
 
     <!-- Scroll to Top Button -->
     <button
