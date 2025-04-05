@@ -34,7 +34,7 @@
           Assets in Vault: <span class="balance-amount">{{ vaultBalance }} USDC</span>
         </p>
         <div class="buttons-container">
-          <v-btn class="start-deposit-btn" elevation="0" @click="openPiggyBank">
+          <v-btn class="start-deposit-btn" elevation="0" @click="openDepositDialog">
             Deposit
           </v-btn>
           <v-btn class="start-Withdrawals-btn" elevation="0" @click="openWithdraw">
@@ -124,6 +124,13 @@
       @update:visible="showWithdraw = $event"
       @confirm="handleWithdrawConfirm"
     />
+    
+    <!-- 添加存款對話框 -->
+    <DepositDialog
+      :visible="showDepositDialog"
+      @update:visible="showDepositDialog = $event"
+      @deposit-success="handleDepositSuccess"
+    />
   </div>
 </template>
 
@@ -132,6 +139,7 @@ import { ref, onMounted, watch, computed } from 'vue'
 import History from '../components/History.vue'
 import TokenList4626 from '../components/4626list.vue'
 import Withdraw from '../components/withdraw.vue'
+import DepositDialog from '../components/DepositDialog.vue'
 import { useWalletStore } from '../store/wallet'
 import { useRouter } from 'vue-router'
 
@@ -142,6 +150,7 @@ const showWalletInfo = ref(false)
 const showFeedbackModal = ref(false)
 const show4626List = ref(false)
 const showWithdraw = ref(false)
+const showDepositDialog = ref(false)
 const vaultBalance = ref('0.00')
 const showThankYou = ref(false)
 const showCommentInput = ref(false)
@@ -182,8 +191,17 @@ watch(() => walletStore.isConnected, async (newValue) => {
   }
 })
 
-function openPiggyBank() {
+function openDepositBank() {
   show4626List.value = true
+}
+
+function openDepositDialog() {
+  showDepositDialog.value = true
+}
+
+function handleDepositSuccess() {
+  // Update vault balance after successful deposit
+  updateVaultBalance()
 }
 
 function openWithdraw() {
@@ -194,6 +212,8 @@ function handleWithdrawConfirm() {
   // 處理提款確認後的邏輯
   console.log('Withdrawal confirmed')
   showWithdraw.value = false
+  // Update balance
+  updateVaultBalance()
 }
 
 function handleNavClick(item) {
