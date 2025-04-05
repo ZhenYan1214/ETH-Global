@@ -168,11 +168,11 @@
             <v-card class="result-card" color="primary" variant="flat">
               <div class="d-flex align-center pa-4">
                 <div class="piggy-icon mr-4">
-                  <v-avatar size="56" class="bg-white piggy-avatar">
+                  <v-avatar size="56" class="usdc-avatar">
                     <v-img 
-                      src="@/assets/logo.png" 
-                      alt="Piggy Logo" 
-                      @error="handlePiggyImageError"
+                      :src="usdcLogoUrl" 
+                      alt="USDC" 
+                      @error="handleUsdcImageError"
                     />
                   </v-avatar>
                 </div>
@@ -312,6 +312,10 @@ const emit = defineEmits(['update:visible', 'deposit-success']);
 const walletStore = useWalletStore();
 const tokenStore = useTokenStore();
 
+// USDC相關常量和變量
+const USDC_ADDRESS = '0x2791bca1f2de4661ed88a30c99a7a9449aa84174';
+const usdcLogoUrl = ref('https://cryptologos.cc/logos/usd-coin-usdc-logo.png');
+
 const dialogVisible = computed({
   get: () => props.visible,
   set: (value) => emit('update:visible', value)
@@ -340,8 +344,31 @@ watch(() => props.visible, async (isVisible) => {
     depositPreview.value = null;
     transactionHash.value = '';
     await loadTokens();
+    
+    // 嘗試從token store獲取USDC圖標
+    tryGetUsdcLogo();
   }
 });
+
+// 嘗試從token store獲取USDC圖標
+function tryGetUsdcLogo() {
+  // 從allTokens中獲取USDC信息
+  const usdcToken = tokenStore.allTokens[USDC_ADDRESS.toLowerCase()];
+  if (usdcToken && usdcToken.logoURI) {
+    usdcLogoUrl.value = usdcToken.logoURI;
+    console.log('Found USDC logo:', usdcLogoUrl.value);
+  } else {
+    console.log('Using default USDC logo');
+  }
+}
+
+// Handle USDC logo error
+function handleUsdcImageError(event) {
+  if (event && event.target) {
+    console.log('USDC logo failed to load, using fallback');
+    event.target.src = 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png';
+  }
+}
 
 // Load tokens with balances
 async function loadTokens() {
@@ -411,8 +438,11 @@ function toggleTokenSelection(address) {
   if (token) {
     token.selected = !token.selected;
     
-    // Clear amount if deselected
-    if (!token.selected) {
+    // If selected, automatically set to MAX amount
+    if (token.selected) {
+      setMaxAmount(token);
+    } else {
+      // Clear amount if deselected
       token.amount = '';
     }
   }
@@ -561,20 +591,6 @@ function getTokenLogoSource(token) {
   } else {
     // Use the current source based on previous attempts
     return getNextImageSource(token, sourceIndex - 1);
-  }
-}
-
-// Handle Piggy logo error
-function handlePiggyImageError(event) {
-  if (event && event.target) {
-    // Hide the broken image
-    event.target.style.display = 'none';
-    
-    // Try to find the avatar element and add a fallback
-    const avatar = event.target.closest('.v-avatar');
-    if (avatar) {
-      avatar.innerHTML = '<div class="piggy-fallback">P</div>';
-    }
   }
 }
 
@@ -824,93 +840,121 @@ function openExplorer() {
 
 <style scoped>
 .deposit-dialog {
-  border-radius: 16px;
+  border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
 }
 
 .dialog-header {
-  background: linear-gradient(45deg, #FF6F91, #FF8DA1) !important;
+  background: linear-gradient(135deg, #FF6F91, #FF9FB0) !important;
+  height: 65px !important;
 }
 
 .token-list {
   max-height: 400px;
   overflow-y: auto;
+  padding: 4px 2px;
+  margin: 0 -2px;
   scrollbar-width: thin;
-  scrollbar-color: rgba(0, 0, 0, 0.1) transparent;
+  scrollbar-color: rgba(255, 111, 145, 0.3) transparent;
 }
 
 .token-list::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 .token-list::-webkit-scrollbar-track {
-  background: transparent;
+  background: rgba(0, 0, 0, 0.02);
+  border-radius: 10px;
 }
 
 .token-list::-webkit-scrollbar-thumb {
-  background-color: rgba(0, 0, 0, 0.1);
+  background-color: rgba(255, 111, 145, 0.3);
   border-radius: 10px;
 }
 
 .token-item {
-  border-radius: 12px;
+  border-radius: 16px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  transition: all 0.25s cubic-bezier(0.25, 0.8, 0.25, 1);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: #ffffff;
+  margin-bottom: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
 .token-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 15px rgba(0, 0, 0, 0.08);
+  transform: translateY(-3px);
+  border-color: rgba(255, 111, 145, 0.2);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.07);
 }
 
 .token-item.selected {
-  border-color: var(--v-theme-primary);
-  background-color: rgba(var(--v-theme-primary), 0.05);
+  border-color: rgba(255, 111, 145, 0.8);
+  background: linear-gradient(to right, rgba(255, 111, 145, 0.05), rgba(255, 255, 255, 0.9));
+  box-shadow: 0 5px 15px rgba(255, 111, 145, 0.1);
 }
 
 .token-amount {
   position: relative;
   border-top: 1px solid rgba(0, 0, 0, 0.05);
+  background-color: rgba(0, 0, 0, 0.02);
+  border-bottom-left-radius: 16px;
+  border-bottom-right-radius: 16px;
 }
 
 .max-btn {
   font-size: 0.75rem;
   font-weight: bold;
   letter-spacing: 0.5px;
+  margin-left: 4px;
+  border-radius: 8px;
+  transition: all 0.2s ease;
+  padding: 0 12px !important;
+  height: 28px !important;
+  background-color: rgba(255, 111, 145, 0.08) !important;
+}
+
+.max-btn:hover {
+  background-color: rgba(255, 111, 145, 0.15) !important;
+  transform: translateY(-1px);
 }
 
 .amount-field {
   flex: 1;
 }
 
+.amount-field :deep(.v-field__outline) {
+  opacity: 0.7;
+}
+
+.amount-field :deep(.v-field--focused .v-field__outline) {
+  opacity: 1;
+}
+
 .error-message {
   color: var(--v-theme-error);
   font-size: 0.85rem;
   line-height: 1.4;
+  padding: 10px 15px;
+  border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(var(--v-theme-error), 0.1);
 }
 
 .bg-error-lightened {
   background-color: rgba(var(--v-theme-error), 0.08);
 }
 
-.token-preview-item {
-  border-radius: 12px;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+.token-avatar {
+  border: 2px solid #ffffff;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  background: linear-gradient(45deg, #f8f8f8, #ffffff);
 }
 
-.result-card {
-  border-radius: 16px;
-  background: linear-gradient(45deg, #FF6F91, #FF8DA1) !important;
-  box-shadow: 0 4px 15px rgba(255, 111, 145, 0.25);
-}
-
-.success-container, .error-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
+.token-item.selected .token-avatar {
+  border-color: rgba(255, 111, 145, 0.3);
+  box-shadow: 0 2px 10px rgba(255, 111, 145, 0.15);
 }
 
 .token-icon-container {
@@ -937,14 +981,75 @@ function openExplorer() {
   font-size: 12px;
 }
 
-.token-avatar {
-  background-color: rgba(0, 0, 0, 0.03);
-  border: 1px solid rgba(0, 0, 0, 0.05);
+.v-btn.primary {
+  background: linear-gradient(135deg, #FF6F91, #FF9FB0) !important;
+  box-shadow: 0 4px 10px rgba(255, 111, 145, 0.25) !important;
+  transition: all 0.3s ease;
+  border-radius: 12px;
 }
 
-.piggy-avatar {
-  padding: 4px;
-  border: 1px solid rgba(255, 255, 255, 0.2);
+.v-btn.primary:hover:not(:disabled) {
+  box-shadow: 0 6px 15px rgba(255, 111, 145, 0.35) !important;
+  transform: translateY(-2px);
+}
+
+.token-preview-item {
+  border-radius: 16px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.05);
+  transition: all 0.25s ease;
+  overflow: hidden;
+  animation: fadeIn 0.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.token-preview-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+}
+
+.result-card {
+  border-radius: 20px;
+  background: linear-gradient(135deg, #FF6F91, #FF9FB0) !important;
+  box-shadow: 0 10px 25px rgba(255, 111, 145, 0.25) !important;
+  transition: all 0.3s ease;
+  animation: fadeIn 0.6s 0.1s both;
+}
+
+.result-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 15px 30px rgba(255, 111, 145, 0.3) !important;
+}
+
+.usdc-avatar {
+  padding: 2px;
+  border: 2px solid rgba(255, 255, 255, 0.5);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  background-color: white;
+  transition: all 0.3s ease;
+  transform: scale(1);
+  animation: pulseAvatar 2s ease-in-out infinite alternate;
+}
+
+@keyframes pulseAvatar {
+  from {
+    transform: scale(1);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+  }
+  to {
+    transform: scale(1.05);
+    box-shadow: 0 8px 20px rgba(255, 255, 255, 0.2);
+  }
 }
 
 .piggy-fallback {
@@ -958,19 +1063,47 @@ function openExplorer() {
   color: #FF6F91;
   background-color: white;
   border-radius: 50%;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.1);
 }
 
 .receive-preview {
-  background-color: rgba(0, 0, 0, 0.02);
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  background-color: rgba(255, 111, 145, 0.03);
+  border: 1px solid rgba(255, 111, 145, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.03);
+  transition: all 0.3s ease;
+}
+
+.receive-preview:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.05);
+}
+
+.transaction-info {
+  border-radius: 16px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+  transition: all 0.3s ease;
+}
+
+.transaction-info:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.04);
+}
+
+.success-container, .error-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .transaction-notification {
+  background: linear-gradient(to right, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.9));
+  box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(255, 111, 145, 0.1);
   width: 100%;
   max-width: 400px;
   border-radius: 12px;
-  background-color: #f9f9f9;
-  border: 1px solid rgba(0, 0, 0, 0.1);
   margin-left: auto;
   margin-right: auto;
 }
@@ -979,5 +1112,30 @@ function openExplorer() {
   font-family: monospace;
   color: var(--v-theme-primary);
   max-width: 150px;
+  background: rgba(255, 111, 145, 0.05);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.preview-container {
+  animation: fadeIn 0.5s ease-out;
+}
+
+.preview-container .text-h6 {
+  position: relative;
+  display: inline-block;
+  padding-bottom: 8px;
+}
+
+.preview-container .text-h6::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 40px;
+  height: 3px;
+  background: linear-gradient(to right, #FF6F91, #FF9FB0);
+  transform: translateX(-50%);
+  border-radius: 3px;
 }
 </style> 
