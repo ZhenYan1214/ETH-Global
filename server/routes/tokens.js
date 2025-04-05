@@ -35,9 +35,11 @@ router.get("/prices/:chainId/:tokenAddresses", async (req, res) => {
   try {
     const { chainId, tokenAddresses } = req.params;
     const tokenArray = tokenAddresses.split(",");
+    console.log(`前端請求：查詢價格 chainId=${chainId}, tokens=${tokenAddresses}`);
     const result = await getTokenSpotPrices(chainId, tokenArray);
     res.status(200).json(result);
   } catch (error) {
+    console.error("Token price error:", error);
     res.status(500).json({ error: "無法獲取價格", details: error.message });
   }
 });
@@ -136,24 +138,35 @@ async function getWalletBalances(chainId, walletAddress, retries = 3, delay = 10
   }
 }
 
-// 獲取 token 即時價格
+// 獲取 token 即時價格 - 使用新的 POST API
 async function getTokenSpotPrices(chainId, tokenAddresses, retries = 3, delay = 1000) {
   try {
-    const url = `${BASE_URL}/price/v1.1/${chainId}/${tokenAddresses.join(",")}`;
+    const url = `${BASE_URL}/price/v1.1/${chainId}`;
     console.log("Request URL (Prices):", url);
-
+    
+    // 準備請求配置
+    const config = {
+      headers: {
+        "Authorization": `Bearer ${API_KEY}`
+      },
+      paramsSerializer: {
+        indexes: null
+      }
+    };
+    
+    // 準備請求體
+    const body = {
+      "tokens": tokenAddresses,
+      "currency": "USD"
+    };
+    
+    console.log("Price request body:", body);
+    
+    // 發送 POST 請求
     let response;
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
-        response = await axios.get(url, {
-          headers: {
-            Authorization: `Bearer ${API_KEY}`,
-          },
-          paramsSerializer: { indexes: null },
-        });
-        if (response.status !== 200) {
-          throw new Error(`1inch API 回應錯誤，狀態碼：${response.status}`);
-        }
+        response = await axios.post(url, body, config);
         break;
       } catch (error) {
         console.error(`嘗試 ${attempt}/${retries} 失敗:`, error.message);
@@ -161,10 +174,9 @@ async function getTokenSpotPrices(chainId, tokenAddresses, retries = 3, delay = 
         await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
-
-    const pricesData = response.data;
-    console.log("1inch API Response (Prices):", pricesData);
-    return pricesData;
+    
+    return response.data;
+    
   } catch (error) {
     console.error("Error fetching token prices from 1inch:", error.message);
     throw error;
