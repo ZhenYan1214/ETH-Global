@@ -1,10 +1,10 @@
 import axios from 'axios'
 
-// 模擬數據設置
-const USE_MOCK_DATA = true // 當API連接失敗時啟用
-const MOCK_DELAY = 1500 // 模擬延遲時間 (毫秒)
+// Mock data settings
+const USE_MOCK_DATA = false // Enable when API connection fails
+const MOCK_DELAY = 1500 // Mock delay time (milliseconds)
 
-// 基本模擬數據
+// Basic mock data
 const MOCK_DATA = {
   '/tokens/list/137': {
     balances: [
@@ -47,69 +47,124 @@ const MOCK_DATA = {
   }
 }
 
-// 創建 axios 實例
+// API configuration
+const API_CONFIG = {
+  RETRY: {
+    MAX_RETRIES: 3,
+    RETRY_DELAY: 1000,
+    BACKOFF_FACTOR: 2
+  },
+  TIMEOUT: 15000,
+  DEBUG: import.meta.env.MODE === 'development'
+}
+
+// Create axios instance
 const api = axios.create({
   baseURL: `${import.meta.env.VITE_API_URL || 'http://localhost:3011'}/api`,
-  timeout: 15000,
+  timeout: API_CONFIG.TIMEOUT,
   headers: {
     'Content-Type': 'application/json'
   }
 })
 
-// 請求攔截器
+// Request interceptor
 api.interceptors.request.use(
   (config) => {
-    // 開發環境下記錄請求
-    if (import.meta.env.MODE === 'development') {
-      console.log(`[API] 請求: ${config.method.toUpperCase()} ${config.baseURL}${config.url}`, config.data || {})
+    // Log requests in development environment
+    if (API_CONFIG.DEBUG) {
+      console.log(`[API] Request: ${config.method.toUpperCase()} ${config.baseURL}${config.url}`, config.data || {})
     }
     
     return config
   },
   (error) => {
-    console.error('[API] 請求錯誤:', error)
+    console.error('[API] Request error:', error)
     return Promise.reject(error)
   }
 )
 
-// 回應攔截器
+// Response interceptor
 api.interceptors.response.use(
   (response) => {
-    // 返回更簡潔的數據結構
-    if (import.meta.env.MODE === 'development') {
-      console.log(`[API] 回應來自 ${response.config.url}:`, response.data)
+    // Return simpler data structure
+    if (API_CONFIG.DEBUG) {
+      console.log(`[API] Response from ${response.config.url}:`, response.data)
     }
     return response.data
   },
   (error) => {
     const errorResponse = {
       status: error.response?.status || 0,
-      message: error.response?.data?.message || error.message || '發生未知錯誤',
+      message: error.response?.data?.message || error.message || 'Unknown error occurred',
       errors: error.response?.data?.errors || [],
       originalError: error
     }
     
-    // 開發環境下記錄錯誤
-    if (import.meta.env.MODE === 'development') {
-      console.error('[API] 回應錯誤:', errorResponse)
+    // Log errors in development environment
+    if (API_CONFIG.DEBUG) {
+      console.error('[API] Response error:', errorResponse)
     }
     
     return Promise.reject(errorResponse)
   }
 )
 
-// 根據 URL 獲取模擬數據
+/**
+ * Implements exponential backoff retry logic for API requests
+ * @param {Function} apiCall - Function that returns a promise for the API call
+ * @param {Object} options - Retry options
+ * @returns {Promise} - Promise resolving to the API response
+ */
+async function withRetry(apiCall, options = {}) {
+  const maxRetries = options.maxRetries || API_CONFIG.RETRY.MAX_RETRIES;
+  const retryDelay = options.retryDelay || API_CONFIG.RETRY.RETRY_DELAY;
+  const backoffFactor = options.backoffFactor || API_CONFIG.RETRY.BACKOFF_FACTOR;
+  
+  let lastError = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await apiCall();
+    } catch (error) {
+      lastError = error;
+      
+      // Don't retry for certain status codes
+      if (error.status === 400 || error.status === 401 || error.status === 403) {
+        break;
+      }
+      
+      // Last attempt, don't wait
+      if (attempt === maxRetries) {
+        break;
+      }
+      
+      // Calculate backoff time
+      const delay = retryDelay * Math.pow(backoffFactor, attempt - 1);
+      
+      if (API_CONFIG.DEBUG) {
+        console.warn(`[API] Attempt ${attempt} failed, retrying in ${delay}ms...`, error.message);
+      }
+      
+      // Wait before next attempt
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw lastError;
+}
+
+// Get mock data based on URL
 function getMockData(url) {
-  // 從 URL 中提取路徑
+  // Extract path from URL
   const path = url.split('?')[0]
   
-  // 處理特殊路徑,例如帶有參數的路徑
+  // Handle special paths with parameters
   if (path.includes('/tokens/prices/137/')) {
     const addresses = path.split('/tokens/prices/137/')[1]
     const mockPrices = {}
     addresses.split(',').forEach(addr => {
       const lowerAddr = addr.toLowerCase()
-      // 為每個地址提供模擬價格
+      // Provide mock price for each address
       if (lowerAddr.includes('3c499c542cef5e3811e1192ce70d8cc03d5c3359')) {
         mockPrices[lowerAddr] = '1.00' // USDC
       } else if (lowerAddr.includes('7ceb23fd6bc0add59e62ac25578270cff1b9f619')) {
@@ -117,102 +172,103 @@ function getMockData(url) {
       } else if (lowerAddr.includes('0d500b1d8e8ef31e21c99d1db9a6444d3adf1270')) {
         mockPrices[lowerAddr] = '0.75' // WMATIC
       } else {
-        mockPrices[lowerAddr] = '0.50' // 默認值
+        mockPrices[lowerAddr] = '0.50' // Default value
       }
     })
     return mockPrices
   }
   
-  // 處理用戶特定資訊
+  // Handle wallet balance requests
+  if (path.includes('/tokens/balances/')) {
+    const pathParts = path.split('/tokens/balances/')[1].split('/')
+    const chainId = pathParts[0]
+    const walletAddress = pathParts[1]
+    
+    return {
+      walletAddress,
+      chainId,
+      balances: [
+        {
+          token: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
+          balance: '1000000000',
+          usdValue: 'N/A'
+        },
+        {
+          token: '0x7ceB23fD6bC0adD59E62ac25578270cFf1b9f619',
+          balance: '500000000000000000',
+          usdValue: 'N/A'
+        },
+        {
+          token: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270',
+          balance: '2000000000000000000',
+          usdValue: 'N/A'
+        }
+      ]
+    }
+  }
+  
+  // Handle user specific information
   if (path.includes('/vault/user/')) {
     return {
       userAddress: path.split('/vault/user/')[1],
       depositAmount: '500000000',  // 500 USDC
-      shareAmount: '475000000',    // 用戶份額
-      depositValue: '500.00',      // USD 值
-      userPercentage: '10'         // 佔總份額的百分比
+      shareAmount: '475000000',    // User shares
+      depositValue: '500.00',      // USD value
+      userPercentage: '10'         // Percentage of total shares
     }
   }
   
-  // 處理預覽存款
+  // Handle deposit preview
   if (path === '/vault/preview-deposit') {
     return {
       srcAmount: '100000000',     // 100 USDC
-      dstAmount: '95000000',      // 獲得的份額
-      expectedValueUSD: '100.00', // 預期USD值
-      fee: '1.0',                 // 費率
-      expectedAPY: '8.5'          // 預期APY
+      dstAmount: '95000000',      // Shares received
+      expectedValueUSD: '100.00', // Expected USD value
+      fee: '1.0',                 // Fee rate
+      expectedAPY: '8.5'          // Expected APY
     }
   }
   
-  // 基本模擬數據
+  // Basic mock data
   for (const key in MOCK_DATA) {
     if (path === key || path.startsWith(key)) {
       return MOCK_DATA[key]
     }
   }
   
-  // 如果沒有匹配的模擬數據
-  console.warn(`[API] 沒有找到路徑的模擬數據: ${path}`)
-  return { message: '模擬數據不可用' }
+  // If no matching mock data is found
+  console.warn(`[API] No mock data found for path: ${path}`)
+  return { message: 'Mock data not available' }
 }
 
-// API 服務方法
+// API service methods
 const apiService = {
-  async get(endpoint, params = {}) {
-    try {
-      // 嘗試實際API調用
-      return await api.get(endpoint, { params })
-    } catch (error) {
-      // 如果API連接失敗且啟用了模擬數據
-      if (USE_MOCK_DATA) {
-        console.warn(`[API] 使用 ${endpoint} 的模擬數據`)
-        
-        // 模擬延遲
-        await new Promise(resolve => setTimeout(resolve, MOCK_DELAY))
-        
-        // 返回模擬數據
-        return getMockData(endpoint)
-      }
-      
-      // 如果未啟用模擬數據，繼續拋出錯誤
-      throw error
-    }
+  async get(endpoint, params = {}, retryOptions = {}) {
+    return withRetry(
+      () => api.get(endpoint, { params }),
+      retryOptions
+    );
   },
   
-  async post(endpoint, data = {}) {
-    try {
-      return await api.post(endpoint, data)
-    } catch (error) {
-      // 如果API連接失敗且啟用了模擬數據
-      if (USE_MOCK_DATA && endpoint === '/vault/preview-deposit') {
-        console.warn(`[API] 使用 ${endpoint} 的模擬數據`)
-        
-        // 模擬延遲
-        await new Promise(resolve => setTimeout(resolve, MOCK_DELAY))
-        
-        // 返回預覽存款的模擬數據
-        return getMockData(endpoint)
-      }
-      
-      throw error
-    }
+  async post(endpoint, data = {}, retryOptions = {}) {
+    return withRetry(
+      () => api.post(endpoint, data),
+      retryOptions
+    );
   },
   
-  async put(endpoint, data = {}) {
-    try {
-      return await api.put(endpoint, data)
-    } catch (error) {
-      throw error
-    }
+  async put(endpoint, data = {}, retryOptions = {}) {
+    return withRetry(
+      () => api.put(endpoint, data),
+      retryOptions
+    );
   },
   
-  async delete(endpoint, params = {}) {
-    try {
-      return await api.delete(endpoint, { params })
-    } catch (error) {
-      throw error
-    }
+  async delete(endpoint, params = {}, retryOptions = {}) {
+    return withRetry(
+      () => api.delete(endpoint, { params }),
+      retryOptions
+    );
   }
 }
 

@@ -1,29 +1,34 @@
 <template>
   <v-card class="simple-token-preview" variant="outlined" @click="$emit('select')">
-    <div class="pa-3">
-      <div class="d-flex align-center">
+    <div class="pa-4">
+      <!-- Token Info Section -->
+      <div class="d-flex align-center mb-3">
         <!-- Token Icon -->
-        <v-avatar size="40" class="mr-3">
+        <v-avatar size="40" class="token-avatar mr-3">
           <v-img :src="getTokenLogo(token.address)" @error="handleImageError" />
         </v-avatar>
         
         <!-- Token Symbol & Balance -->
-        <div class="token-info">
+        <div class="token-info flex-grow-1">
           <div class="token-symbol">{{ getTokenSymbol(token.address) }}</div>
           <div class="token-balance text-caption text-grey">{{ formatBalance(token) }}</div>
         </div>
-        
-        <!-- Amount Input -->
-        <div class="amount-display ml-auto">
+      </div>
+      
+      <!-- Amount Input Section -->
+      <div class="amount-section">
+        <div class="amount-input-container">
           <v-text-field
             v-model="localAmount"
             density="compact"
-            variant="plain"
+            variant="outlined"
             hide-details
-            class="text-right token-amount-field"
+            class="token-amount-field"
+            placeholder="0.00"
             type="text"
             @input="$emit('amount-change', $event.target.value)"
           ></v-text-field>
+          
           <v-btn
             v-if="showClearButton && localAmount"
             icon="mdi-close"
@@ -38,8 +43,8 @@
       </div>
       
       <!-- Value Display -->
-      <div class="d-flex justify-space-between align-center token-value-row mt-1">
-        <div class="text-caption">$1.00</div>
+      <div class="d-flex justify-space-between align-center token-value-row mt-3">
+        <div class="text-caption text-grey-darken-1">$1.00</div>
         <div class="text-caption text-right token-value">≈ ${{ calculateTokenValue }}</div>
       </div>
     </div>
@@ -143,14 +148,19 @@ function handleImageError(event) {
 
 <style scoped>
 .simple-token-preview {
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
   transition: all 0.2s ease;
   cursor: pointer;
 }
 
 .simple-token-preview:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.token-avatar {
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
 .token-info {
@@ -161,16 +171,22 @@ function handleImageError(event) {
 .token-symbol {
   font-weight: 600;
   font-size: 16px;
+  line-height: 1.2;
 }
 
 .token-balance {
   font-size: 12px;
   color: rgba(0, 0, 0, 0.6);
+  margin-top: 2px;
 }
 
-.amount-display {
+.amount-section {
   position: relative;
-  min-width: 100px;
+  margin-bottom: 8px;
+}
+
+.amount-input-container {
+  position: relative;
 }
 
 .token-amount-field {
@@ -178,8 +194,8 @@ function handleImageError(event) {
 }
 
 .token-amount-field :deep(input) {
-  text-align: right !important;
   font-size: 16px;
+  text-align: right;
 }
 
 .token-value-row {
@@ -189,11 +205,12 @@ function handleImageError(event) {
 
 .token-value {
   font-weight: 500;
+  color: var(--v-theme-primary);
 }
 
 .clear-btn {
   position: absolute;
-  right: 0;
+  right: 8px;
   top: 50%;
   transform: translateY(-50%);
 }
