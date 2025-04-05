@@ -33,7 +33,7 @@ const router = createRouter({
   routes
 })
 
-// 路由守卫，确保在进入Swap页面时加载代币
+// Route guard to ensure tokens are loaded when entering Swap page
 router.beforeEach(async (to, from, next) => {
   if (to.name === 'swap') {
     const tokenStore = useTokenStore()

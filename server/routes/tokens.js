@@ -2,49 +2,49 @@ const express = require('express')
 const router = express.Router()
 const axios = require('axios')
 
-// 1inch API 的基礎 URL 和 API Key
+// Base URL and API Key for 1inch API
 const BASE_URL = process.env.ONEINCH_API_URL || "https://api.1inch.dev";
 const API_KEY = process.env.ONEINCH_API_KEY || "";
 
-// 查詢所有可用代幣的路由
+// Route to query all available tokens
 router.get("/list/:chainId", async (req, res) => {
   try {
     const { chainId } = req.params;
-    console.log(`前端請求：獲取所有代幣列表 chainId=${chainId}`);
+    console.log(`Frontend request: Get all tokens list chainId=${chainId}`);
     const result = await getAllTokens(chainId);
     res.status(200).json(result);
   } catch (error) {
-    res.status(500).json({ error: "無法獲取代幣列表", details: error.message });
+    res.status(500).json({ error: "Unable to get token list", details: error.message });
   }
 });
 
-// 查詢錢包餘額的路由
+// Route to query wallet balances
 router.get("/balances/:chainId/:walletAddress", async (req, res) => {
   try {
     const { chainId, walletAddress } = req.params;
-    console.log(`前端請求：查詢 chainId=${chainId}, walletAddress=${walletAddress}`);
+    console.log(`Frontend request: Query chainId=${chainId}, walletAddress=${walletAddress}`);
     const result = await getWalletBalances(chainId, walletAddress);
     res.status(200).json(result);
   } catch (error) {
-    res.status(500).json({ error: "無法獲取錢包餘額", details: error.message });
+    res.status(500).json({ error: "Unable to get wallet balances", details: error.message });
   }
 });
 
-// 查詢 token 價格的路由
+// Route to query token prices
 router.get("/prices/:chainId/:tokenAddresses", async (req, res) => {
   try {
     const { chainId, tokenAddresses } = req.params;
     const tokenArray = tokenAddresses.split(",");
-    console.log(`前端請求：查詢價格 chainId=${chainId}, tokens=${tokenAddresses}`);
+    console.log(`Frontend request: Query prices chainId=${chainId}, tokens=${tokenAddresses}`);
     const result = await getTokenSpotPrices(chainId, tokenArray);
     res.status(200).json(result);
   } catch (error) {
     console.error("Token price error:", error);
-    res.status(500).json({ error: "無法獲取價格", details: error.message });
+    res.status(500).json({ error: "Unable to get prices", details: error.message });
   }
 });
 
-// 獲取所有代幣
+// Get all tokens
 async function getAllTokens(chainId, retries = 3, delay = 1000) {
   try {
     const url = `${BASE_URL}/swap/v6.0/${chainId}/tokens`;
@@ -62,11 +62,11 @@ async function getAllTokens(chainId, retries = 3, delay = 1000) {
           }
         });
         if (response.status !== 200) {
-          throw new Error(`1inch API 回應錯誤，狀態碼：${response.status}`);
+          throw new Error(`1inch API error response, status code: ${response.status}`);
         }
         break;
       } catch (error) {
-        console.error(`嘗試 ${attempt}/${retries} 失敗:`, error.message);
+        console.error(`Attempt ${attempt}/${retries} failed:`, error.message);
         if (attempt === retries) throw error;
         await new Promise(resolve => setTimeout(resolve, delay));
       }
@@ -75,7 +75,7 @@ async function getAllTokens(chainId, retries = 3, delay = 1000) {
     const tokensData = response.data;
     console.log("1inch API Response (All Tokens):", Object.keys(tokensData.tokens).length, "tokens found");
     
-    // 添加鏈 ID 和時間戳記錄
+    // Add chain ID and timestamp
     return {
       chainId,
       timestamp: new Date().toISOString(),
@@ -87,10 +87,10 @@ async function getAllTokens(chainId, retries = 3, delay = 1000) {
   }
 }
 
-// 獲取錢包餘額
+// Get wallet balances
 async function getWalletBalances(chainId, walletAddress, retries = 3, delay = 1000) {
   try {
-    const url = `${BASE_URL}/balance/v1.2/${chainId}/balances/${walletAddress}`; // 修正 URL
+    const url = `${BASE_URL}/balance/v1.2/${chainId}/balances/${walletAddress}`; // Fix URL
     console.log("Request URL (Balances):", url);
 
     let response;
@@ -102,11 +102,11 @@ async function getWalletBalances(chainId, walletAddress, retries = 3, delay = 10
           },
         });
         if (response.status !== 200) {
-          throw new Error(`1inch API 回應錯誤，狀態碼：${response.status}`);
+          throw new Error(`1inch API error response, status code: ${response.status}`);
         }
         break;
       } catch (error) {
-        console.error(`嘗試 ${attempt}/${retries} 失敗:`, error.message);
+        console.error(`Attempt ${attempt}/${retries} failed:`, error.message);
         if (attempt === retries) throw error;
         await new Promise(resolve => setTimeout(resolve, delay));
       }
@@ -138,13 +138,13 @@ async function getWalletBalances(chainId, walletAddress, retries = 3, delay = 10
   }
 }
 
-// 獲取 token 即時價格 - 使用新的 POST API
+// Get token spot prices - using new POST API
 async function getTokenSpotPrices(chainId, tokenAddresses, retries = 3, delay = 1000) {
   try {
     const url = `${BASE_URL}/price/v1.1/${chainId}`;
     console.log("Request URL (Prices):", url);
     
-    // 準備請求配置
+    // Prepare request config
     const config = {
       headers: {
         "Authorization": `Bearer ${API_KEY}`
@@ -154,7 +154,7 @@ async function getTokenSpotPrices(chainId, tokenAddresses, retries = 3, delay = 
       }
     };
     
-    // 準備請求體
+    // Prepare request body
     const body = {
       "tokens": tokenAddresses,
       "currency": "USD"
@@ -162,14 +162,14 @@ async function getTokenSpotPrices(chainId, tokenAddresses, retries = 3, delay = 
     
     console.log("Price request body:", body);
     
-    // 發送 POST 請求
+    // Send POST request
     let response;
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
         response = await axios.post(url, body, config);
         break;
       } catch (error) {
-        console.error(`嘗試 ${attempt}/${retries} 失敗:`, error.message);
+        console.error(`Attempt ${attempt}/${retries} failed:`, error.message);
         if (attempt === retries) throw error;
         await new Promise(resolve => setTimeout(resolve, delay));
       }
