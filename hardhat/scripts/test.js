@@ -1,311 +1,227 @@
 const hre = require("hardhat");
 const { ethers } = hre;
 
-// 測試時請確認以下地址為你在本地 or 測試網要使用的合約
 const WETH_ADDRESS   = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2";
 const USDC_ADDRESS   = "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48";
 const UNISWAP_ROUTER = "0xE592427A0AEce92De3Edee1F18E0157C05861564";
 const YEARN_VAULT    = "0xBe53A109B494E5c9f97b9Cd39Fe969BE68BF6204";
 const POOL_FEE = 500;
 
-// ----------------------------------------------
-// 幫助函式：印出當前狀態 (Vault & 使用者) 以做排查
-// ----------------------------------------------
-async function logVaultState(title, vault, usdc, deployerAddr) {
-  const vaultAddr = await vault.getAddress();
-
-  // Vault & User USDC 餘額
-  const vaultUsdcBal = await usdc.balanceOf(vaultAddr);
-  const userUsdcBal  = await usdc.balanceOf(deployerAddr);
-
-  // Vault 全域狀態
-  const totalPendingUSDC = await vault.totalPendingUSDC();
-  const totalPendingPiggy = await vault.totalPendingPiggyShares();
-  const investedPiggy = await vault.investedPiggyShares();
-  const yearnSharesBal = await vault.yearnSharesBalance();
-
-  // 使用者 info
-  const userVaultShares = await vault.balanceOf(deployerAddr);
-  // struct UserInfo { deposited, shares, pending, lastUpdateTime }
-  const userInfo = await vault.userInfo(deployerAddr);
-  // ethers v6 讀 struct: userInfo[0], userInfo[1], ...
-
-  console.log(`\n[${title}] State:`);
-  console.log(`Vault USDC:         ${ethers.formatUnits(vaultUsdcBal, 6)}`);
-  console.log(`User  USDC:         ${ethers.formatUnits(userUsdcBal, 6)}`);
-  console.log(`totalPendingUSDC:   ${ethers.formatUnits(totalPendingUSDC, 6)}`);
-  console.log(`totalPendingPiggy:  ${ethers.formatUnits(totalPendingPiggy, 6)}`);
-  console.log(`investedPiggy:      ${ethers.formatUnits(investedPiggy, 6)}`);
-  console.log(`yearnSharesBalance: ${ethers.formatUnits(yearnSharesBal, 6)}`);
-  console.log(`User Vault shares:  ${ethers.formatUnits(userVaultShares, 6)}`);
-
-  console.log(`UserInfo.deposited: ${ethers.formatUnits(userInfo.deposited, 6)}`);
-  console.log(`UserInfo.shares:    ${ethers.formatUnits(userInfo.shares, 6)}`);
-  console.log(`UserInfo.pending:   ${ethers.formatUnits(userInfo.pending, 6)}`);
-  console.log(`UserInfo.lastUpdate:${userInfo.lastUpdateTime}`);
-  console.log("----------------------------------------------------\n");
-}
-
 async function main() {
-  const [deployer] = await ethers.getSigners();
-  console.log("Running as:", deployer.address);
+  const signers = await ethers.getSigners();
+  const deployer = signers[0];
+  const user1 = signers[1];
+  const user2 = signers[2];
+  const user3 = signers[3];
+  const user4 = signers[4];
+  const user5 = signers[5];
+
+  console.log("Deployer:", deployer.address);
+  console.log("User1:", user1.address);
+  console.log("User2:", user2.address);
+  console.log("User3:", user3.address);
+  console.log("User4:", user4.address);
+  console.log("User5:", user5.address);
 
   // ------------------------------------------------
-  // 1) 部署合約：SwapETHForUSDC
+  // 部署合約
   // ------------------------------------------------
   const SwapETHForUSDC = await ethers.getContractFactory("SwapETHForUSDC");
   const swapContract = await SwapETHForUSDC.deploy(USDC_ADDRESS);
   await swapContract.waitForDeployment();
-  const swapAddress = await swapContract.getAddress();
-  console.log("SwapETHForUSDC deployed at:", swapAddress);
+  console.log("SwapETHForUSDC deployed at:", await swapContract.getAddress());
 
-  // ------------------------------------------------
-  // 2) 部署新的 PiggyVault
-  //    (需保證包含 depositAndInvest, redeemPending, redeemInvested 等函式)
-  // ------------------------------------------------
   const PiggyVault = await ethers.getContractFactory("PiggyVault");
   const vault = await PiggyVault.deploy(
-    deployer.address, // _initialOwner
-    USDC_ADDRESS,     // _usdc
-    YEARN_VAULT       // _yearnVault
+    deployer.address,
+    USDC_ADDRESS,
+    YEARN_VAULT
   );
   await vault.waitForDeployment();
-  const vaultAddress = await vault.getAddress();
-  console.log("PiggyVault deployed at:", vaultAddress);
+  console.log("PiggyVault deployed at:", await vault.getAddress());
 
-  // 讀取 WETH / Router code length 以確認
-  const wethCode = await ethers.provider.getCode(WETH_ADDRESS);
-  const routerCode = await ethers.provider.getCode(UNISWAP_ROUTER);
-  console.log("WETH contract code length:", wethCode.length);
-  console.log("Uniswap Router code length:", routerCode.length);
-
-  // 取得 USDC ERC20 物件
+  // 取得 USDC
   const usdc = await ethers.getContractAt(
     "@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20",
     USDC_ADDRESS,
     deployer
   );
 
-  // ------------------------------------------------
-  // (A) 測試「分段流程」：swap -> deposit -> invest
-  // ------------------------------------------------
-  console.log("\n=== (A) Test '分段流程' ===");
-  const oneETH = ethers.parseEther("1");
+  // 幫助函式：印出 vault 狀態
+  async function logVaultState(label) {
+    const pendingUSDC = await vault.totalPendingUSDC();
+    const pendingPiggy = await vault.totalPendingPiggyShares();
+    const investedPiggy = await vault.investedPiggyShares();
+    const yearnBal = await vault.yearnSharesBalance();
 
-  // 1. Swap 1 ETH → USDC
-  const txSwapA = await swapContract.swapEthForUsdc(
-    WETH_ADDRESS,
-    UNISWAP_ROUTER,
-    oneETH,
-    0,
-    POOL_FEE,
-    { value: oneETH }
-  );
-  await txSwapA.wait();
-  console.log("✅ Swapped 1 ETH → USDC (分段)");
+    console.log(`\n[${label}] Vault state:`);
+    console.log("totalPendingUSDC:", ethers.formatUnits(pendingUSDC, 6));
+    console.log("totalPendingPiggy:", ethers.formatUnits(pendingPiggy, 6));
+    console.log("investedPiggy:", ethers.formatUnits(investedPiggy, 6));
+    console.log("yearnSharesBalance:", ethers.formatUnits(yearnBal, 6));
+  }
 
-  // 2. deployer 的真實 USDC
-  const usdcBalanceA = await usdc.balanceOf(deployer.address);
-  console.log("User real USDC after swap (A):", ethers.formatUnits(usdcBalanceA, 6));
+  // 幫助函式：印出使用者 share / pending / USDC餘額
+  async function logUserState(u, label) {
+    const userShares = await vault.balanceOf(u.address);
+    const userUsdc = await usdc.balanceOf(u.address);
+    const info = await vault.userInfo(u.address);
 
-  // 3. Approve Vault
-  await usdc.approve(vaultAddress, ethers.MaxUint256);
-  console.log("✅ Approved USDC to vault (A)");
-
-  // 4. Deposit
-  const depositTxA = await vault.deposit(usdcBalanceA, deployer.address);
-  await depositTxA.wait();
-  console.log("✅ Deposited USDC into vault (pending) (A)");
-
-  // 4.1 印出狀態
-  await logVaultState("After deposit(A)", vault, usdc, deployer.address);
-
-  // 5. invest
-  const investTxA = await vault.invest();
-  await investTxA.wait();
-  console.log("✅ Invested pending USDC into Yearn (A)");
-
-  // 5.1 再印出狀態
-  await logVaultState("After invest(A)", vault, usdc, deployer.address);
-
-  // 6. Vault share
-  const sharesA = await vault.balanceOf(deployer.address);
-  console.log("Vault shares (A after invest):", ethers.formatUnits(sharesA, 6));
+    console.log(`[${label}] user: ${u.address}`);
+    console.log("Vault shares:", ethers.formatUnits(userShares, 6));
+    console.log("User USDC:", ethers.formatUnits(userUsdc, 6));
+    console.log("UserInfo pending:", ethers.formatUnits(info.pending, 6));
+    console.log("UserInfo shares:", ethers.formatUnits(info.shares, 6));
+    console.log("UserInfo deposited:", ethers.formatUnits(info.deposited, 6));
+    console.log("-----");
+  }
 
   // ------------------------------------------------
-  // (B) 一鍵流程：swap -> depositAndInvest
+  // 幫助函式：swap 0.5 ETH => USDC
   // ------------------------------------------------
-  console.log("\n=== (B) Test '一鍵流程' => depositAndInvest ===");
-  const txSwapB = await swapContract.swapEthForUsdc(
-    WETH_ADDRESS,
-    UNISWAP_ROUTER,
-    oneETH,
-    0,
-    POOL_FEE,
-    { value: oneETH }
-  );
-  await txSwapB.wait();
-  console.log("✅ Swapped 1 ETH → USDC (一鍵)");
-
-  const usdcBalanceB = await usdc.balanceOf(deployer.address);
-  console.log("User real USDC (B):", ethers.formatUnits(usdcBalanceB, 6));
-
-  // Approve
-  await usdc.approve(vaultAddress, ethers.MaxUint256);
-
-  // depositAndInvest
-  const daiTx = await vault.depositAndInvest(usdcBalanceB, deployer.address);
-  await daiTx.wait();
-  console.log("✅ depositAndInvest 成功 (B)");
-
-  // (B).1 印出狀態
-  await logVaultState("After depositAndInvest(B)", vault, usdc, deployer.address);
-
-  // 查看新的 shares
-  const sharesBTotal = await vault.balanceOf(deployer.address);
-  const sharesNewlyMintedB = sharesBTotal - sharesA;
-  console.log("Vault shares (B newly minted):", ethers.formatUnits(sharesNewlyMintedB, 6));
-  console.log("Vault shares (B total):", ethers.formatUnits(sharesBTotal, 6));
+  async function swapHalfETHForUser(u) {
+    const halfETH = ethers.parseEther("0.5");
+    await swapContract.connect(u).swapEthForUsdc(
+      WETH_ADDRESS,
+      UNISWAP_ROUTER,
+      halfETH,
+      0,
+      POOL_FEE,
+      { value: halfETH }
+    );
+    const bal = await usdc.balanceOf(u.address);
+    console.log(`User ${u.address} USDC after swap:`, ethers.formatUnits(bal, 6));
+  }
 
   // ------------------------------------------------
-  // (C) 預覽 & 贖回全部
+  // 給五位使用者都換 0.5 ETH => USDC
   // ------------------------------------------------
-  console.log("\n=== (C) Redeem all shares ===");
-  const previewC = await vault.previewRedeemValue(deployer.address);
-  console.log("previewRedeemValue:", ethers.formatUnits(previewC, 6));
-
-  const redeemTxC = await vault.redeem(sharesBTotal, deployer.address, deployer.address);
-  await redeemTxC.wait();
-  console.log("✅ Redeemed all vault shares (C)");
-
-  const finalUsdcC = await usdc.balanceOf(deployer.address);
-  console.log("Final USDC after redeem (C):", ethers.formatUnits(finalUsdcC, 6));
-
-  // (C).1 印出狀態
-  await logVaultState("After redeemAll(C)", vault, usdc, deployer.address);
+  await swapHalfETHForUser(user1);
+  await swapHalfETHForUser(user2);
+  await swapHalfETHForUser(user3);
+  await swapHalfETHForUser(user4);
+  await swapHalfETHForUser(user5);
 
   // ------------------------------------------------
-  // (D) 測試 redeemPending()
+  // Step 3: 複雜存款流程
   // ------------------------------------------------
-  console.log("\n=== (D) Test redeemPending() ===");
-  // Swap 1 ETH -> USDC
-  const txSwapD = await swapContract.swapEthForUsdc(
-    WETH_ADDRESS,
-    UNISWAP_ROUTER,
-    oneETH,
-    0,
-    POOL_FEE,
-    { value: oneETH }
-  );
-  await txSwapD.wait();
-  console.log("✅ Swapped 1 ETH → USDC (D for redeemPending)");
+  console.log("\n=== Step 3: complex deposit patterns ===");
 
-  const usdcBalanceD = await usdc.balanceOf(deployer.address);
-  console.log("User real USDC (D):", ethers.formatUnits(usdcBalanceD, 6));
+  // user1 deposit half
+  {
+    const bal1 = await usdc.balanceOf(user1.address);
+    const depositAmt = bal1 / 2n;
+    await usdc.connect(user1).approve(vault, ethers.MaxUint256);
+    const tx = await vault.connect(user1).deposit(depositAmt, user1.address);
+    await tx.wait();
+    console.log("User1 deposit() half:", ethers.formatUnits(depositAmt, 6));
+    await logVaultState("After user1 deposit");
+    await logUserState(user1, "user1 deposit");
+  }
 
-  await usdc.approve(vaultAddress, ethers.MaxUint256);
-  const depositTxD = await vault.deposit(usdcBalanceD, deployer.address);
-  await depositTxD.wait();
-  console.log("✅ Deposit => pending (D)");
+  // user2 depositAndInvest 2/3
+  {
+    const bal2 = await usdc.balanceOf(user2.address);
+    const depositAmt = (bal2 * 2n) / 3n;
+    await usdc.connect(user2).approve(vault, ethers.MaxUint256);
+    const tx = await vault.connect(user2).depositAndInvest(depositAmt, user2.address);
+    await tx.wait();
+    console.log("User2 depositAndInvest() 2/3:", ethers.formatUnits(depositAmt, 6));
+    await logVaultState("After user2 depositAndInvest");
+    await logUserState(user2, "user2 depositAndInvest");
+  }
 
-  // (D).1 印出狀態
-  await logVaultState("After deposit(D)", vault, usdc, deployer.address);
+  // user3 deposit all
+  {
+    const bal3 = await usdc.balanceOf(user3.address);
+    await usdc.connect(user3).approve(vault, ethers.MaxUint256);
+    const tx = await vault.connect(user3).deposit(bal3, user3.address);
+    await tx.wait();
+    console.log("User3 deposit() all:", ethers.formatUnits(bal3, 6));
+    await logVaultState("After user3 deposit all");
+    await logUserState(user3, "user3 deposit");
+  }
 
-  const sharesPendingD = await vault.balanceOf(deployer.address);
-  console.log("User vault shares (all pending):", ethers.formatUnits(sharesPendingD, 6));
+  // user4 depositAndInvest all
+  {
+    const bal4 = await usdc.balanceOf(user4.address);
+    await usdc.connect(user4).approve(vault, ethers.MaxUint256);
+    const tx = await vault.connect(user4).depositAndInvest(bal4, user4.address);
+    await tx.wait();
+    console.log("User4 depositAndInvest() all:", ethers.formatUnits(bal4, 6));
+    await logVaultState("After user4 depositAndInvest");
+    await logUserState(user4, "user4 depositAndInvest");
+  }
 
-  // redeemPending
-  const redeemPendingTx = await vault.redeemPending(sharesPendingD);
-  await redeemPendingTx.wait();
-  console.log("✅ redeemPending, got USDC back (D)");
-
-  const usdcAfterRP = await usdc.balanceOf(deployer.address);
-  console.log("USDC after redeemPending (D):", ethers.formatUnits(usdcAfterRP, 6));
-
-  // (D).2 印出狀態
-  await logVaultState("After redeemPending(D)", vault, usdc, deployer.address);
+  // user5 deposit half
+  {
+    const bal5 = await usdc.balanceOf(user5.address);
+    const depositAmt = bal5 / 2n;
+    await usdc.connect(user5).approve(vault, ethers.MaxUint256);
+    const tx = await vault.connect(user5).deposit(depositAmt, user5.address);
+    await tx.wait();
+    console.log("User5 deposit() half:", ethers.formatUnits(depositAmt, 6));
+    await logVaultState("After user5 deposit half");
+    await logUserState(user5, "user5 deposit");
+  }
 
   // ------------------------------------------------
-  // (E) 測試 redeemInvested()
+  // Step 4: user1 / user2 invests entire pool pending
   // ------------------------------------------------
-  console.log("\n=== (E) Test redeemInvested() ===");
-  // Swap 1 ETH -> USDC
-  const txSwapE = await swapContract.swapEthForUsdc(
-    WETH_ADDRESS,
-    UNISWAP_ROUTER,
-    oneETH,
-    0,
-    POOL_FEE,
-    { value: oneETH }
-  );
-  await txSwapE.wait();
-  console.log("✅ Swapped 1 ETH → USDC (E for redeemInvested)");
+  console.log("\n=== Step 4: user1 / user2 invests entire pool pending ===");
+  {
+    // user1 invests
+    console.log("User1 calls invest()...");
+    const tx = await vault.connect(user1).invest();
+    await tx.wait();
+    await logVaultState("After user1 invests");
+    await logUserState(user1, "user1 after invests");
 
-  const usdcBalanceE = await usdc.balanceOf(deployer.address);
-  console.log("User real USDC (E):", ethers.formatUnits(usdcBalanceE, 6));
+    // user2 invests
+    console.log("User2 calls invest()...");
+    const tx2 = await vault.connect(user2).invest();
+    await tx2.wait();
+    await logVaultState("After user2 invests");
+    await logUserState(user2, "user2 after invests");
+  }
 
-  // --- 在這裡插入檢查 deposit 前狀態 ---
-  await logVaultState("Before deposit(E)", vault, usdc, deployer.address);
+  // ------------------------------------------------
+  // Step 5: partial redeem or pending redeem
+  // ------------------------------------------------
+  console.log("\n=== Step 5: partial redeem or pending redeem ===");
+  {
+    // user1 partial redeemInvested
+    const user1Shares = await vault.balanceOf(user1.address);
+    const halfUser1 = user1Shares / 2n;
+    console.log("User1 total shares:", ethers.formatUnits(user1Shares, 6),
+                " => redeemInvested half:", ethers.formatUnits(halfUser1, 6));
+    const tx = await vault.connect(user1).redeemInvested(halfUser1);
+    await tx.wait();
+    console.log("User1 partial redeemInvested half => done");
+    await logVaultState("After user1 partial redeemInvested");
+    await logUserState(user1, "user1 after partial redeemInvested");
+  }
 
-  // deposit
-  await usdc.approve(vaultAddress, ethers.MaxUint256);
-  console.log("Deployer USDC before deposit (E):", ethers.formatUnits(
-    await usdc.balanceOf(deployer.address), 6
-  ));
+  {
+    // user2 try redeemPending (if any)
+    const user2Shares = await vault.balanceOf(user2.address);
+    console.log("User2 total shares:", ethers.formatUnits(user2Shares, 6));
+    const halfUser2 = user2Shares / 2n;
+    console.log("User2 redeemPending half =>", ethers.formatUnits(halfUser2, 6));
 
-  const depositTxE = await vault.deposit(usdcBalanceE, deployer.address);
-  await depositTxE.wait();
-  console.log("✅ Deposit (E) => pending");
+    try {
+      const tx = await vault.connect(user2).redeemPending(halfUser2);
+      await tx.wait();
+      console.log("User2 redeemPending half => done");
+    } catch(e) {
+      console.log("User2 redeemPending failed or no pending =>", e.reason);
+    }
+    await logVaultState("After user2 redeemPending");
+    await logUserState(user2, "user2 after redeemPending");
+  }
 
-  console.log("Deployer USDC after deposit (E):", ethers.formatUnits(
-    await usdc.balanceOf(deployer.address), 6
-  ));
-  console.log("Vault USDC after deposit (E):", ethers.formatUnits(
-    await usdc.balanceOf(vaultAddress), 6
-  ));
-
-  // (E).1 再印出狀態
-  await logVaultState("After deposit(E)", vault, usdc, deployer.address);
-
-  // invest
-  const investTxE = await vault.invest();
-  await investTxE.wait();
-  console.log("✅ Invest => now user shares are invested (E)");
-
-  // (E).2 再印出狀態
-  await logVaultState("After invest(E)", vault, usdc, deployer.address);
-
-  const sharesInvestedE = await vault.balanceOf(deployer.address);
-  console.log("User vault shares (invested E):", ethers.formatUnits(sharesInvestedE, 6));
-
-  // redeemInvested 全部
-  const redeemInvestedTx = await vault.redeemInvested(sharesInvestedE);
-  await redeemInvestedTx.wait();
-  console.log("✅ redeemInvested, got USDC back (E)");
-
-  const finalUsdcE = await usdc.balanceOf(deployer.address);
-  console.log("Final USDC after redeemInvested (E):", ethers.formatUnits(finalUsdcE, 6));
-
-  // (E).3 最後印出狀態
-  await logVaultState("After redeemInvested(E)", vault, usdc, deployer.address);
-
-// ------------------------------------------------
-// (F) 測試 withdrawAccumulatedFees()
-// ------------------------------------------------
-console.log("\n=== (F) Withdraw Accumulated Fees ===");
-
-// 先看看提領前的 Vault 狀態
-await logVaultState("Before withdrawFees(F)", vault, usdc, deployer.address);
-
-// 呼叫 withdrawAccumulatedFees，把累積費用提領到 deployer
-const feeTx = await vault.withdrawAccumulatedFees(deployer.address);
-await feeTx.wait();
-console.log("✅ Fees withdrawn (F)");
-
-// 再次檢查
-await logVaultState("After withdrawFees(F)", vault, usdc, deployer.address);
-
-console.log("\n=== All tests + Fee withdrawal done ===");
+  // ... 你可再繼續 Step 6, Step 7, etc. 做更多測試
+  // ...
 }
 
 main().catch((error) => {

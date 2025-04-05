@@ -204,31 +204,58 @@ contract PiggyVault is ERC4626, Ownable, ReentrancyGuard {
      *      (不會動到其他人的 pending)
      */
     function depositAndInvest(uint256 assets, address receiver)
-        external
-        nonReentrant
-        gasGuard
-        returns (uint256)
-    {
-        // 1. 先執行 _depositInternal()
-        uint256 mintedShares = _depositInternal(assets, receiver);
+    external
+    nonReentrant
+    gasGuard
+    returns (uint256)
+{
+    require(assets > 0, "Zero deposit");
 
-        // 2. 更新使用者 & 全域：扣掉這次存款帶來的 pending share, pending USDC
-        userInfo[receiver].pending -= mintedShares;
-        totalPendingPiggyShares -= mintedShares;
-        totalPendingUSDC -= assets;
+    // 1) 從 msg.sender 收取 USDC
+    usdc.transferFrom(msg.sender, address(this), assets);
 
-        // 3. 調用 yearnVault.deposit()
-        uint256 yearnSharesOut = yearnVault.deposit(assets, address(this));
-        yearnSharesBalance += yearnSharesOut;
+    // 2) 用 convertToShares 計算要鑄造多少 piggyVault share
+    uint256 shares = convertToShares(assets);
+    require(shares > 0, "Zero shares");
 
-        // 4. 把 mintedShares 視為已投資
-        investedPiggyShares += mintedShares;
+    // 3) 鑄造 piggyVault share 給 receiver
+    _mint(receiver, shares);
 
-        // 5. 事件
-        emit Invested(msg.sender, assets, yearnSharesOut);
-        emit DepositAndInvest(receiver, assets, mintedShares, yearnSharesOut);
-        return mintedShares;
+    // 4) 更新使用者資訊 (加權平均成本 / user.shares)
+    UserInfo storage user = userInfo[receiver];
+    _updateUserPending(receiver); // 可留著確保若有 stale pending 就清理
+
+    uint256 prevValue = user.deposited * user.shares; 
+    uint256 newValue = assets;                      
+    uint256 totalShares = user.shares + shares;
+    if (totalShares > 0) {
+        user.deposited = (prevValue + newValue) / totalShares;
     }
+
+    // 只增加 user.shares，但不增加 user.pending
+    user.shares += shares;
+    user.lastUpdateTime = block.timestamp;
+
+    // ★ 不動 totalPendingPiggyShares / totalPendingUSDC
+    //   因為這筆 USDC 不是要留在 pending 狀態
+
+    // 作為統計記錄可保留
+    totalDeposited += assets;
+
+    // 5) 直接將這筆 USDC 投入 Yearn
+    uint256 yearnSharesOut = yearnVault.deposit(assets, address(this));
+    yearnSharesBalance += yearnSharesOut;
+
+    // 6) piggyVault share 轉為 invested
+    investedPiggyShares += shares;
+
+    // 7) 事件
+    emit Invested(msg.sender, assets, yearnSharesOut);
+    emit DepositAndInvest(receiver, assets, shares, yearnSharesOut);
+
+    return shares;
+}
+
 
     // -------------------------------------------
     // (4) invest(): 把整池 pending USDC 全投進 Yearn
