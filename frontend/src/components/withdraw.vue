@@ -2,7 +2,7 @@
     <v-dialog :model-value="visible" max-width="600" scrollable @update:model-value="$emit('update:visible', $event)">
       <v-card class="withdraw-dialog">
         <v-toolbar color="primary" density="compact">
-          <v-toolbar-title class="text-white">提款</v-toolbar-title>
+          <v-toolbar-title class="text-white">Withdraw</v-toolbar-title>
           <v-spacer></v-spacer>
           <v-btn icon variant="text" color="white" @click="closeDialog">
             <v-icon>mdi-close</v-icon>
@@ -12,11 +12,11 @@
         <div class="pa-4">
           <div v-if="loadingBalance" class="text-center py-8">
             <v-progress-circular indeterminate color="primary" size="64"></v-progress-circular>
-            <div class="mt-4 text-subtitle-1">正在加載您的餘額...</div>
+            <div class="mt-4 text-subtitle-1">Loading your balance...</div>
           </div>
   
           <div v-else class="balance-container">
-            <h3 class="text-h5 mb-2">可提款餘額</h3>
+            <h3 class="text-h5 mb-2">Available Balance</h3>
             
             <div class="balance-card pa-4 mb-4">
               <div class="d-flex align-center">
@@ -33,7 +33,7 @@
             <v-card class="mb-4 pa-4">
               <div class="mb-4">
                 <div class="d-flex align-center justify-space-between mb-2">
-                  <div class="text-subtitle-1">提款金額</div>
+                  <div class="text-subtitle-1">Withdrawal Amount</div>
                   <v-btn 
                     density="compact" 
                     variant="text" 
@@ -41,7 +41,7 @@
                     @click="setMaxAmount" 
                     class="text-caption"
                   >
-                    全部提款
+                    Withdraw All
                   </v-btn>
                 </div>
                 
@@ -88,23 +88,23 @@
                 <div class="detail-row">
                   <div class="detail-label">
                     <v-icon small color="primary" class="mr-1">mdi-cash-multiple</v-icon>
-                    手續費
+                    Fee
                   </div>
-                  <div class="detail-value free-tag">免費</div>
+                  <div class="detail-value interest-tag">Deducted from Interest</div>
                 </div>
   
                 <div class="detail-row">
                   <div class="detail-label">
                     <v-icon small color="primary" class="mr-1">mdi-gas-station</v-icon>
-                    網絡費用 (預估)
+                    Network Cost
                   </div>
-                  <div class="detail-value">{{ networkFee }} ETH</div>
+                  <div class="detail-value sponsored-tag">Sponsored</div>
                 </div>
   
                 <div class="detail-row highlight">
                   <div class="detail-label">
                     <v-icon small color="primary" class="mr-1">mdi-chart-line</v-icon>
-                    預計到賬
+                    You Will Receive
                   </div>
                   <div class="detail-value">{{ amountToReceive }} USDC</div>
                 </div>
@@ -124,15 +124,15 @@
               class="withdraw-button"
               @click="processWithdraw"
             >
-              <span class="button-text">✨ 確認提款 ✨</span>
+              <span class="button-text">✨ Confirm Withdrawal ✨</span>
             </v-btn>
           </div>
   
           <div v-if="withdrawStatus === 'success'" class="success-container text-center pa-4">
             <v-icon color="success" size="64">mdi-check-circle</v-icon>
-            <h3 class="text-h5 mt-4">提款成功！</h3>
-            <p class="text-body-1 mt-2">您的 USDC 已提取。</p>
-            <v-btn color="primary" class="mt-4" @click="closeDialog">完成</v-btn>
+            <h3 class="text-h5 mt-4">Withdrawal Successful!</h3>
+            <p class="text-body-1 mt-2">Your USDC has been withdrawn.</p>
+            <v-btn color="primary" class="mt-4" @click="closeDialog">Done</v-btn>
           </div>
         </div>
       </v-card>
@@ -155,29 +155,30 @@
   const vaultStore = useVaultStore()
   const mainStore = useMainStore()
   
+  const isFullWithdrawal = ref(false) // Mark if it's a full withdrawal
   const redeemableBalance = ref('0')
   const amount = ref('')
   const loadingBalance = ref(true)
   const error = ref('')
   const isProcessing = ref(false)
   const withdrawStatus = ref(null) // 'processing', 'success', 'error'
-  const networkFee = ref('0.005')
+  const networkFee = ref('0.005000')
   
-  // 新增：滑塊相關變數
+  // New: slider-related variables
   const sliderValue = ref(0)
-  const sliderStep = 0.01 // 滑塊的最小步長
+  const sliderStep = 0.000001 // Minimum step length for the slider, supports 6 decimal places
   
-  // 計算滑塊的最大值（依據餘額）
+  // Calculate slider maximum value (based on balance)
   const maxSliderValue = computed(() => {
-    return Number(redeemableBalance.value) / 1_000_000 // 轉換為 USDC 單位
+    return Number(redeemableBalance.value) / 1_000_000 // Convert to USDC units
   })
   
-  // 從滑塊數值更新輸入金額
+  // Update amount from slider
   const updateAmountFromSlider = (val) => {
     amount.value = val.toString()
   }
   
-  // 從輸入金額更新滑塊位置
+  // Update slider from amount
   const updateSliderFromAmount = (val) => {
     const numVal = parseFloat(val)
     if (!isNaN(numVal) && numVal >= 0 && numVal <= maxSliderValue.value) {
@@ -185,36 +186,38 @@
     }
   }
   
-  // 格式化滑塊標籤顯示
+  // Format slider label display
   const formatSliderLabel = (val) => {
-    return val.toFixed(2)
+    return val.toFixed(6)
   }
   
-  // 格式化用於顯示的金額
+  // Format displayed amount
   const formattedAmount = computed(() => {
-    if (!amount.value || isNaN(parseFloat(amount.value))) return '0.00'
-    return parseFloat(amount.value).toFixed(2)
+    if (!amount.value || isNaN(parseFloat(amount.value))) return '0.000000'
+    return parseFloat(amount.value).toFixed(6)
   })
   
-  // 從餘額中加載可提款的數量
+  // Load available withdrawal balance
   const loadRedeemableBalance = async () => {
     loadingBalance.value = true
     try {
+      // Force refresh to ensure getting the latest data from the blockchain
+      await walletStore.fetchBalance() // Refresh wallet balance first
       const balance = await walletStore.getUserVaultWithdrawable()
-      console.log("balance--", balance)
+      console.log("Available withdrawal balance:", balance.toString())
       redeemableBalance.value = balance.toString()
       
-      // 重置滑塊值和金額（當重新載入餘額時）
+      // Reset slider value and amount (when reloading balance)
       if (amount.value === '') {
-        // 初始化滑塊值為 0
+        // Initialize slider value to 0
         sliderValue.value = 0
       } else {
-        // 如果已有金額，則更新滑塊值
+        // If amount already exists, update slider value
         updateSliderFromAmount(amount.value)
       }
     } catch (err) {
-      console.error('加載可提款餘額失敗:', err)
-      error.value = '無法加載可提款餘額。請稍後再試。'
+      console.error('Failed to load withdrawal balance:', err)
+      error.value = 'Unable to load withdrawal balance. Please try again later.'
       redeemableBalance.value = '0'
       sliderValue.value = 0
     } finally {
@@ -222,57 +225,70 @@
     }
   }
   
-  // 格式化餘額顯示
+  // Format balance display
   const formatBalance = (balanceInWei) => {
-    const value = Number(balanceInWei) / 1_000_000 // USDC 有 6 位小數
+    const value = Number(balanceInWei) / 1_000_000 // USDC has 6 decimal places
     return value.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
+      minimumFractionDigits: 6,
       maximumFractionDigits: 6
     })
   }
   
-  // 設置最大金額
+  // Set maximum amount - fixed to use exact values to avoid rounding issues
   const setMaxAmount = () => {
-    const value = Number(redeemableBalance.value) / 1_000_000 // USDC 有 6 位小數
-    amount.value = value.toString()
-    sliderValue.value = value // 同時更新滑塊的值
+    // Mark this as a full withdrawal
+    isFullWithdrawal.value = true
+    
+    // Use string format directly to avoid floating point precision issues
+    const exactValue = Number(redeemableBalance.value) / 1_000_000
+    amount.value = exactValue.toString()
+    
+    // Set slider to maximum value
+    sliderValue.value = maxSliderValue.value
   }
   
-  // 檢查金額是否有效
+  // Check amount validity
   const amountRule = (value) => {
-    if (!value) return '請輸入金額'
+    if (!value) return 'Please enter an amount'
     
     const numValue = parseFloat(value)
     const maxValue = Number(redeemableBalance.value) / 1_000_000
     
-    if (numValue <= 0) return '金額必須大於 0'
-    if (numValue > maxValue) return `金額不能超過您的餘額 (${maxValue.toFixed(6)} USDC)`
+    if (numValue <= 0) return 'Amount must be greater than 0'
+    if (numValue > maxValue) {
+      // Show balance in 6 decimal places
+      const formattedMax = maxValue.toLocaleString(undefined, {
+        minimumFractionDigits: 6,
+        maximumFractionDigits: 6
+      })
+      return `Amount cannot exceed your balance (${formattedMax} USDC)`
+    }
     
     return true
   }
   
-  // 計算用戶將收到的金額
+  // Calculate amount user will receive
   const amountToReceive = computed(() => {
-    if (!amount.value || isNaN(parseFloat(amount.value))) return '0.00'
+    if (!amount.value || isNaN(parseFloat(amount.value))) return '0.000000'
     
     const numAmount = parseFloat(amount.value)
     return numAmount.toLocaleString(undefined, {
-      minimumFractionDigits: 2,
+      minimumFractionDigits: 6,
       maximumFractionDigits: 6
     })
   })
   
-  // 檢查是否有餘額
+  // Check if balance exists
   const hasBalance = computed(() => {
     return redeemableBalance.value && BigInt(redeemableBalance.value) > 0
   })
   
-  // 檢查是否可以提款
+  // Check if withdrawal is possible
   const canWithdraw = computed(() => {
     return hasBalance.value && amount.value && parseFloat(amount.value) > 0 && !isProcessing.value
   })
   
-  // 處理提款
+  // Process withdrawal
   const processWithdraw = async () => {
     if (!canWithdraw.value) return
     
@@ -281,50 +297,65 @@
     error.value = ''
     
     try {
-      // 將輸入的金額轉換為 USDC 單位 (6 位小數)
-      const amountInUsdcUnits = BigInt(Math.floor(parseFloat(amount.value) * 1_000_000))
+      let amountInUsdcUnits;
       
-      // 呼叫提款函數
+      // If it's a full withdrawal, use the original balance directly, avoiding rounding issues
+      if (isFullWithdrawal.value && redeemableBalance.value !== '0') {
+        amountInUsdcUnits = BigInt(redeemableBalance.value);
+        console.log("Using full balance for withdrawal:", amountInUsdcUnits.toString());
+      } else {
+        // Otherwise use the user-entered amount
+        amountInUsdcUnits = BigInt(Math.floor(parseFloat(amount.value) * 1_000_000));
+        console.log("Using entered amount for withdrawal:", amountInUsdcUnits.toString());
+      }
+      
+      // Call withdrawal function
       const result = await walletStore.sendRedeem(amountInUsdcUnits)
       
       if (result.success) {
         withdrawStatus.value = 'success'
-        // 清除金額輸入
+        // Clear amount input and full withdrawal flag
         amount.value = ''
-        // 重新加載餘額
-        await loadRedeemableBalance()
+        isFullWithdrawal.value = false
+        
+        // Wait a few seconds before reloading balance to ensure blockchain data is updated
+        setTimeout(async () => {
+          await loadRedeemableBalance()
+        }, 2000)
       } else {
-        error.value = result.error || '提款失敗。請稍後再試。'
+        error.value = result.error || 'Withdrawal failed. Please try again later.'
         withdrawStatus.value = 'error'
       }
     } catch (err) {
-      console.error('提款過程中出錯:', err)
-      error.value = err.message || '提款過程中出錯。請稍後再試。'
+      console.error('Error during withdrawal:', err)
+      error.value = err.message || 'Error during withdrawal. Please try again later.'
       withdrawStatus.value = 'error'
     } finally {
       isProcessing.value = false
+      isFullWithdrawal.value = false
     }
   }
   
-  // 關閉對話框
+  // Close dialog
   const closeDialog = () => {
     emit('update:visible', false)
-    // 重置狀態
+    // Reset state
     withdrawStatus.value = null
     error.value = ''
     amount.value = ''
-    sliderValue.value = 0 // 重置滑塊值
+    sliderValue.value = 0 // Reset slider value
+    isFullWithdrawal.value = false // Reset full withdrawal flag
   }
   
-  // 監聽對話框可見性
+  // Monitor dialog visibility
   watch(() => props.visible, (newVal) => {
     if (newVal) {
-      // 當對話框打開時加載餘額
+      // Load balance when dialog opens
       loadRedeemableBalance()
     }
   })
   
-  // 初始加載
+  // Initial loading
   onMounted(() => {
     if (props.visible) {
       loadRedeemableBalance()
@@ -390,6 +421,16 @@
   
   .free-tag {
     color: #4caf50;
+    font-weight: 600;
+  }
+  
+  .interest-tag {
+    color: #7e57c2;
+    font-weight: 600;
+  }
+  
+  .sponsored-tag {
+    color: #2196f3;
     font-weight: 600;
   }
   
