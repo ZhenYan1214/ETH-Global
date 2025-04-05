@@ -32,15 +32,14 @@
           Welcome to Your <span class="highlight">Piggy Vault!</span>
         </h1>
         <p class="sub-title">
-          金庫中的資產: <span class="balance-amount">{{ walletStore.isConnected ? walletStore.balance + ' ETH' : '0.00 ETH' }}</span>
+          Assets in Vault: <span class="balance-amount">{{ vaultBalance }} USDC</span>
         </p>
-        <p class="apy-info">年化收益率: <span class="apy-value">5.5%</span></p>
         <div class="buttons-container">
           <v-btn class="start-deposit-btn" elevation="0" @click="openPiggyBank">
-            開始存款！！
+            Deposit
           </v-btn>
           <v-btn class="start-Withdrawals-btn" elevation="0" @click="openPiggyBank">
-            提款！！
+            Withdraw
           </v-btn>
         </div>
       </div>
@@ -107,7 +106,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch } from 'vue'
 import History from '../components/History.vue'
 import TokenList4626 from '../components/4626list.vue'
 import { useWalletStore } from '../store/wallet'
@@ -119,12 +118,35 @@ const showHistory = ref(false)
 const showWalletInfo = ref(false)
 const showFeedback = ref(false)
 const show4626List = ref(false)
+const vaultBalance = ref('0.00')
 
 const feedbackOptions = [
   'I Like Something',
   'I Don\'t Like Something',
   'I Have an Idea'
 ]
+
+async function updateVaultBalance() {
+  if (walletStore.isConnected) {
+    try {
+      const balance = await walletStore.getUserVaultWithdrawable()
+      // Convert balance from BigInt to string with proper decimal places
+      vaultBalance.value = (Number(balance) / 1e6).toFixed(2) // USDC has 6 decimals
+    } catch (error) {
+      console.error('Error fetching vault balance:', error)
+      vaultBalance.value = '0.00'
+    }
+  }
+}
+
+// Add watcher for wallet connection status
+watch(() => walletStore.isConnected, async (newValue) => {
+  if (newValue) {
+    await updateVaultBalance()
+  } else {
+    vaultBalance.value = '0.00'
+  }
+})
 
 function openPiggyBank() {
   show4626List.value = true
@@ -153,8 +175,9 @@ function handleTokenSelect(token) {
   // 這裡可以添加選擇代幣後的處理邏輯
 }
 
-onMounted(() => {
+onMounted(async () => {
   createParticles()
+  await updateVaultBalance()
 })
 
 function createParticles() {
@@ -301,13 +324,14 @@ function createParticles() {
 .content-card {
   width: 100%;
   max-width: 1200px;
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.6);
   border-radius: 32px;
-  padding: 32px;
+  padding: 40px;
   text-align: center;
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .main-title {
@@ -325,22 +349,19 @@ function createParticles() {
 }
 
 .balance-amount {
-  font-size: 3rem;
+  font-size: 3.5rem;
   color: #FF6B88;
   font-weight: 700;
-  margin: 0.5rem 0;
+  margin: 1rem 0;
   display: block;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
 }
 
-.apy-info {
-  font-size: 1.1rem;
-  color: #666;
+.sub-title {
+  font-size: 1.4rem;
+  color: #2D2D2D;
   margin-bottom: 24px;
-}
-
-.apy-value {
-  color: #FF6B88;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .buttons-container {
