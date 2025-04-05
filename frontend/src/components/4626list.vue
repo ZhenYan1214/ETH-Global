@@ -131,6 +131,8 @@
         @close="handleTransactionClose"
       />
     </v-dialog>
+
+    <Finish v-if="showFinish" @close="showFinish = false" />
   </div>
 </template>
 
@@ -141,6 +143,7 @@ import { useWalletStore } from '../store/wallet'
 import { useRouter } from 'vue-router'
 import Allowance from './Allowance.vue'
 import TransactionStatus from './TransactionStatus.vue'
+import Finish from './Finish.vue'
 
 const props = defineProps({
   modelValue: {
@@ -157,6 +160,7 @@ const walletStore = useWalletStore()
 const searchText = ref('')
 const showAllowanceDialog = ref(false)
 const showTransactionStatus = ref(false)
+const showFinish = ref(false)
 const transactionStatus = ref('pending')
 const errorMessage = ref('')
 
@@ -311,6 +315,10 @@ function handleTransactionDialogClose() {
 
 function handleTransactionClose() {
   showTransactionStatus.value = false
+}
+
+const openFinish = () => {
+  showFinish.value = true
 }
 
 // 組件掛載時，如果錢包已連接則獲取代幣列表

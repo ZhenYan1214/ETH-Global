@@ -91,18 +91,23 @@
         </div>
       </v-card>
     </v-dialog>
+
     <TransactionStatus
-      v-model="showTransactionStatus"
-      :status="transactionStatus"
-      :error-message="errorMessage"
-      @retry="handleRetry"
+      :visible="showTransactionStatus"
+      :status="'交易處理中...'"
+      :message="'這將花費一點時間，請稍候。'"
+      @update:visible="(val) => showTransactionStatus = val"
+      @done="openFinish"
     />
+
+    <Finish v-if="showFinish" @close="showFinish = false" />
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
 import TransactionStatus from './TransactionStatus.vue'
+import Finish from './Finish.vue'
 
 const props = defineProps({
   modelValue: {
@@ -111,7 +116,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['update:modelValue', 'showTransactionStatus'])
+const emit = defineEmits(['update:modelValue'])
 
 const dialogModel = computed({
   get: () => props.modelValue,
@@ -138,11 +143,9 @@ const exchangeRate = ref('3,652.1543')
 const networkCost = ref('0.007105')
 const expectedReceive = ref('7.2972')
 const expirationTime = ref('30')
-const isConfirming = ref(false)
-
 const showTransactionStatus = ref(false)
-const transactionStatus = ref('pending')
-const errorMessage = ref('')
+const showFinish = ref(false)
+const isConfirming = ref(false)
 
 function handleImageError(event) {
   event.target.src = 'https://via.placeholder.com/40'
@@ -155,8 +158,12 @@ async function handleConfirmDeposit() {
     dialogModel.value = false
     // 等待對話框關閉動畫
     await new Promise(resolve => setTimeout(resolve, 300))
-    // 觸發交易狀態顯示
-    emit('showTransactionStatus')
+    // 顯示交易狀態
+    showTransactionStatus.value = true
+    
+    // 模擬交易過程
+    await new Promise(resolve => setTimeout(resolve, 2000))
+    
   } catch (error) {
     console.error('Deposit failed:', error)
   } finally {
@@ -164,13 +171,10 @@ async function handleConfirmDeposit() {
   }
 }
 
-async function handleRetry() {
-  // 重置狀態
-  transactionStatus.value = 'pending'
-  errorMessage.value = ''
-  
-  // 重新執行存款操作
-  await handleConfirmDeposit()
+const openFinish = () => {
+  console.log('openFinish called, setting showFinish to true')
+  showFinish.value = true
+  console.log('showFinish value:', showFinish.value)
 }
 </script>
 
