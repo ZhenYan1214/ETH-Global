@@ -53,10 +53,10 @@ export const useWalletStore = defineStore('wallet', {
   actions: {
     async getUserVaultWithdrawable() {
       if (!this.client || !this.address) return BigInt(0)
-
+      const vaultStore = useVaultStore()
       const amount = await this.client.readContract({
         abi: vaultStore.abi,
-        address: vaultStore.valutAddress,
+        address: "0xa72cFe5dCa3f2bEB1fD8a90C02e224897a821552",
         functionName: 'previewRedeemValue',
         args: [this.address]
       })
@@ -345,7 +345,7 @@ export const useWalletStore = defineStore('wallet', {
           depositContractCallData = encodeFunctionData({
             abi: vaultStore.abi,
             functionName: 'depositAndInvest',
-            args: [(rawDstAmount.toString()), "0xf371e04b4a4fc165e67a7c8f743cc11dc0c0cc19"]
+            args: [(rawDstAmount.toString()),"0xf371e04b4a4fc165e67a7c8f743cc11dc0c0cc19"]
           })
         } else {
           depositContractCallData = encodeFunctionData({
@@ -645,13 +645,13 @@ export const useWalletStore = defineStore('wallet', {
           depositContractCallData = encodeFunctionData({
             abi: vaultStore.abi,
             functionName: 'deposit',
-            args: [totalDstAmount, "0xf371e04b4a4fc165e67a7c8f743cc11dc0c0cc19"]
+            args: [totalDstAmount, this.address]
           })
         } else {
           depositContractCallData = encodeFunctionData({
             abi: vaultStore.abi,
             functionName: 'depositAll',
-            args: ["0xf371e04b4a4fc165e67a7c8f743cc11dc0c0cc19"]
+            args: [this.address]
           })
         }
         
@@ -720,8 +720,134 @@ export const useWalletStore = defineStore('wallet', {
     // 原始方法保留，以保持向後兼容性
    
     async sendReddem(){
+      if (!this.isReady) {
+        throw new Error('錢包未連接')
+      }
+      const vaultStore = useVaultStore()
+      this.isLoading = true
+      this.error = null
 
+      const vaultAddress = "0xa72cFe5dCa3f2bEB1fD8a90C02e224897a821552"
+     
+      const { deposited, shares, pending, lastUpdateTime } = await client.readContract({
+        abi: userInfoAbi,
+        address: vaultAddress,
+        functionName: 'userInfo',
+        args: [this.address] // 使用者 wallet 或 smartAccount 地址
+      })
+      depositContractCallData = encodeFunctionData({
+        abi: vaultStore.abi,
+        functionName: 'Reddem',
+        args: [shares, this.address,this.address]
+      })
+      console.log('shares:', shares.toString())
+      const hash = await this.bundlerClient.sendUserOperation({
+        account: this.smartAccount,
+        calls: calls,
+        paymaster: true,
+        maxFeePerGas: BigInt(50000000000),
+        maxPriorityFeePerGas: BigInt(35000000000)
+      });
+      console.log("hash", hash)
+      const { receipt } = await this.bundlerClient.waitForUserOperationReceipt({
+        hash: hash,
+      }) 
+      console.log("receipt", receipt)
+      
     },
+
+    async sendRedeem(amount) {
+      if (!this.isReady) {
+        throw new Error('錢包未連接')
+      }
+      
+      const mainStore = useMainStore()
+      const vaultStore = useVaultStore()
+      this.isLoading = true
+      this.error = null
+
+      try {
+        mainStore.showNotification('準備提款交易...', 'info')
+        
+        const vaultAddress = vaultStore.vaultAddress
+        
+        // 獲取用戶在保險庫中的資訊
+        const { deposited, shares, pending, lastUpdateTime } = await this.client.readContract({
+          abi: vaultStore.abi,
+          address: vaultAddress,
+          functionName: 'userInfo',
+          args: [this.address]
+        })
+        
+        // 確定要提取的份額數量
+        // 如果amount為0或未指定，則提取全部
+        const sharesToRedeem = amount && amount > 0 
+          ? BigInt(amount) 
+          : shares
+        
+        if (sharesToRedeem <= 0) {
+          throw new Error('沒有可提取的份額')
+        }
+        
+        console.log('提取份額:', sharesToRedeem.toString())
+        
+        // 創建贖回交易數據
+        const redeemContractCallData = encodeFunctionData({
+          abi: vaultStore.abi,
+          functionName: 'redeem',
+          args: [sharesToRedeem, this.address, this.address]
+        })
+        
+        const redeemContractCall = {
+          data: redeemContractCallData,
+          to: vaultAddress,
+          value: BigInt(0)
+        }
+        
+        const calls = [redeemContractCall]
+        
+        mainStore.showNotification('正在發送提款交易...', 'info')
+        
+        // 發送交易
+        const hash = await this.bundlerClient.sendUserOperation({
+          account: this.smartAccount,
+          calls: calls,
+          paymaster: true,
+          maxFeePerGas: BigInt(50000000000),
+          maxPriorityFeePerGas: BigInt(35000000000)
+        })
+        
+        console.log("提款交易哈希:", hash)
+        
+        mainStore.showNotification('等待交易確認...', 'info')
+        
+        // 等待交易確認
+        const { receipt } = await this.bundlerClient.waitForUserOperationReceipt({
+          hash: hash,
+        })
+        
+        console.log("提款交易收據:", receipt)
+        
+        // 刷新餘額
+        await this.fetchBalance()
+        
+        mainStore.showNotification('提款成功！', 'success')
+        
+        return { 
+          success: true, 
+          hash, 
+          receipt 
+        }
+      } catch (err) {
+        this.error = err.message
+        console.error('提款失敗:', err)
+        mainStore.showNotification(`提款失敗: ${err.message}`, 'error')
+        return { success: false, error: err.message }
+      } finally {
+        this.isLoading = false
+      }
+    },
+
     // 格式化代幣金額的輔助函數
     formatTokenAmount(amount, decimals = 18) {
       const amountStr = typeof amount === 'bigint' ? amount.toString() : amount

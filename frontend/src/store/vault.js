@@ -59,6 +59,17 @@ export const useVaultStore = defineStore('vault', {
   },
 
   actions: {
+    // Helper function to safely serialize objects with BigInt values
+    serializeWithBigInt(obj) {
+      return JSON.parse(JSON.stringify(obj, (key, value) => {
+        // Convert BigInt to string with 'n' suffix to identify it's a BigInt
+        if (typeof value === 'bigint') {
+          return value.toString();
+        }
+        return value;
+      }));
+    },
+    
     // 新增：預覽存款交易
     async previewDeposit(tokens) {
       this.isLoading = true;
@@ -146,22 +157,47 @@ export const useVaultStore = defineStore('vault', {
         console.log('[vault] 狀態設置為processing')
         
         // 通過 Wallet 發送存款交易
-        const result = await walletStore.sendDepositTransaction(tokens)
+        const result = await walletStore.executeDepositTransaction(tokens)
         console.log('[vault] 存款交易結果:', result)
         
-        // 設置交易哈希
-        if (result && result.transactionHash) {
-          this.transactionHash = result.transactionHash
+        // 設置交易哈希 - 根據返回結果結構使用 hash 或 transactionHash
+        if (result && (result.hash || result.transactionHash)) {
+          this.transactionHash = result.hash || result.transactionHash
           console.log('[vault] 交易已提交，交易哈希:', this.transactionHash)
           
-          // 等待交易確認並獲取收據
+          // 檢查是否已經有收據，如果有則直接使用
+          if (result.receipt) {
+            console.log('[vault] 已在結果中找到收據')
+            // 使用安全的序列化方法處理可能包含 BigInt 的收據對象
+            const receiptObj = this.serializeWithBigInt(result.receipt)
+            
+            // 賦值給 depositReceipt
+            this.depositReceipt = receiptObj
+            
+            // 檢查交易是否成功
+            if (receiptObj && receiptObj.status === 'success' || receiptObj.status === 1) {
+              this.depositStatus = 'success'
+              console.log('[vault] 存款交易成功，狀態設置為success')
+              mainStore.showNotification('存款交易成功！', 'success')
+            } else {
+              throw new Error('交易執行失敗')
+            }
+            
+            console.log('[vault] 返回交易結果')
+            return {
+              transactionHash: this.transactionHash,
+              receipt: this.depositReceipt
+            }
+          }
+          
+          // 如果沒有收據，則等待交易確認
           try {
             console.log('[vault] 等待交易確認...')
             const receipt = await walletStore.provider.waitForTransaction(this.transactionHash)
             console.log('[vault] 交易已確認，receipt:', receipt)
             
-            // 把收據轉換成純JavaScript對象，避免響應式問題
-            const receiptObj = JSON.parse(JSON.stringify(receipt))
+            // 使用安全的序列化方法處理可能包含 BigInt 的收據對象
+            const receiptObj = this.serializeWithBigInt(receipt)
             
             // 賦值給 depositReceipt
             this.depositReceipt = receiptObj
@@ -181,12 +217,6 @@ export const useVaultStore = defineStore('vault', {
           }
         } else {
           throw new Error('未能獲取交易哈希')
-        }
-        
-        console.log('[vault] 返回交易結果')
-        return {
-          transactionHash: this.transactionHash,
-          receipt: this.depositReceipt
         }
       } catch (error) {
         console.error('[vault] 存款執行錯誤:', error)
