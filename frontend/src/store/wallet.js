@@ -170,6 +170,84 @@ export const useWalletStore = defineStore('wallet', {
       }
     },
     
+    /**
+     * Generic method to send a transaction using the connected wallet
+     * @param {Object} params - Transaction parameters
+     * @param {string} params.to - Recipient address
+     * @param {string} params.data - Transaction data
+     * @param {string} params.value - Transaction value in wei (hex string)
+     * @param {boolean} params.paymaster - Whether to use a paymaster for the transaction
+     * @returns {Promise<Object>} - Transaction result
+     */
+    async sendTransaction({ to, data, value = '0x0', paymaster = false, maxFeePerGas, maxPriorityFeePerGas }) {
+      if (!this.isReady) {
+        return { success: false, error: 'Wallet not connected' }
+      }
+      
+      this.isLoading = true
+      this.error = null
+      
+      const mainStore = useMainStore()
+      
+      try {
+        console.log('Sending transaction:', { to, data: data.substring(0, 10) + '...', value })
+        
+        if (!to || !data) {
+          throw new Error('Invalid transaction parameters: to and data are required')
+        }
+        
+        // Create transaction request
+        const request = {
+          to,
+          data,
+          value: value || '0x0'
+        }
+        
+        // Add gas parameters if provided
+        if (maxFeePerGas) request.maxFeePerGas = maxFeePerGas
+        if (maxPriorityFeePerGas) request.maxPriorityFeePerGas = maxPriorityFeePerGas
+        
+        // Set paymaster options if enabled
+        if (paymaster) {
+          request.paymasterServiceData = {
+            mode: {
+              type: 'SPONSORED'
+            }
+          }
+        }
+        
+        // Send transaction
+        const hash = await this.bundlerClient.sendTransaction(request)
+        console.log('Transaction sent:', hash)
+        
+        // Wait for transaction to be confirmed
+        mainStore.showNotification('Transaction submitted, waiting for confirmation...', 'info')
+        
+        try {
+          const receipt = await this.bundlerClient.waitForTransactionReceipt({ hash })
+          console.log('Transaction confirmed:', receipt)
+          
+          if (receipt.status === 'success') {
+            // Transaction successful
+            mainStore.showNotification('Transaction confirmed successfully!', 'success')
+            return { success: true, hash, receipt }
+          } else {
+            // Transaction failed
+            throw new Error('Transaction reverted on chain')
+          }
+        } catch (waitError) {
+          console.error('Error waiting for transaction:', waitError)
+          throw new Error(`Transaction failed: ${waitError.message}`)
+        }
+      } catch (err) {
+        console.error('Transaction error:', err)
+        this.error = err.message
+        mainStore.showNotification(`Transaction failed: ${err.message}`, 'error')
+        return { success: false, error: err.message }
+      } finally {
+        this.isLoading = false
+      }
+    },
 
     async sendSwapTransaction({paymaster = true, maxFeePerGas = BigInt(50000000000), maxPriorityFeePerGas = BigInt(35000000000) }) {
       if (!this.isReady) {
@@ -397,10 +475,6 @@ export const useWalletStore = defineStore('wallet', {
         mainStore.showNotification('代幣交換成功！', 'success')
         return { 
           success: true, 
-          approveHash, 
-          approveReceipt, 
-          swapHash, 
-          swapReceipt 
         }
       } catch (err) {
         this.error = err.message

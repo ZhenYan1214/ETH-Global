@@ -22,11 +22,11 @@
               <div class="d-flex align-center">
                 <v-avatar size="48" class="mr-4">
                   <v-img src="https://cryptologos.cc/logos/usd-coin-usdc-logo.png" />
-                </v-avatar>
+              </v-avatar>
                 <div>
                   <div class="text-h4 font-weight-bold">{{ formatBalance(redeemableBalance) }}</div>
                   <div class="text-subtitle-1">USDC</div>
-                </div>
+            </div>
               </div>
             </div>
   
@@ -43,12 +43,12 @@
                   >
                     Withdraw All
                   </v-btn>
-                </div>
+          </div>
                 
                 <div class="amount-display-container mb-2">
                   <div class="amount-display-value">{{ formattedAmount }} USDC</div>
-                </div>
-                
+        </div>
+  
                 <v-slider
                   v-model="sliderValue"
                   color="primary"
@@ -68,7 +68,7 @@
                 <div class="slider-labels d-flex justify-space-between">
                   <span class="text-caption text-grey">0</span>
                   <span class="text-caption text-grey">{{ formatBalance(redeemableBalance) }}</span>
-                </div>
+            </div>
                 
                 <v-text-field
                   v-model="amount"
@@ -82,41 +82,41 @@
                   suffix="USDC"
                   @update:model-value="updateSliderFromAmount"
                 ></v-text-field>
-              </div>
+          </div>
   
               <div class="withdraw-details mt-4">
-                <div class="detail-row">
-                  <div class="detail-label">
-                    <v-icon small color="primary" class="mr-1">mdi-cash-multiple</v-icon>
-                    Fee
-                  </div>
+          <div class="detail-row">
+            <div class="detail-label">
+              <v-icon small color="primary" class="mr-1">mdi-cash-multiple</v-icon>
+              Fee
+            </div>
                   <div class="detail-value interest-tag">Deducted from Interest</div>
-                </div>
+          </div>
   
-                <div class="detail-row">
-                  <div class="detail-label">
-                    <v-icon small color="primary" class="mr-1">mdi-gas-station</v-icon>
+          <div class="detail-row">
+            <div class="detail-label">
+              <v-icon small color="primary" class="mr-1">mdi-gas-station</v-icon>
                     Network Cost
-                  </div>
+            </div>
                   <div class="detail-value sponsored-tag">Sponsored</div>
-                </div>
+          </div>
   
-                <div class="detail-row highlight">
-                  <div class="detail-label">
+          <div class="detail-row highlight">
+            <div class="detail-label">
                     <v-icon small color="primary" class="mr-1">mdi-chart-line</v-icon>
                     You Will Receive
                   </div>
                   <div class="detail-value">{{ amountToReceive }} USDC</div>
-                </div>
-              </div>
+            </div>
+          </div>
             </v-card>
   
             <div v-if="error" class="error-message mb-4">
               {{ error }}
             </div>
   
-            <v-btn
-              block
+          <v-btn
+            block
               :loading="isProcessing"
               :disabled="!canWithdraw"
               color="primary"
@@ -125,7 +125,7 @@
               @click="processWithdraw"
             >
               <span class="button-text">✨ Confirm Withdrawal ✨</span>
-            </v-btn>
+          </v-btn>
           </div>
   
           <div v-if="withdrawStatus === 'success'" class="success-container text-center pa-4">

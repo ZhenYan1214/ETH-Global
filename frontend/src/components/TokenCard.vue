@@ -1,59 +1,68 @@
 <template>
   <v-card class="token-card" elevation="0">
-    <!-- Token Header with Info -->
     <div class="card-content">
-      <!-- Token Info -->
-      <div class="token-info">
-        <v-avatar size="40" class="token-avatar">
-          <v-img :src="getTokenLogo(token.address)" @error="handleImageError" />
-        </v-avatar>
-        <div class="token-details">
-          <div class="text-subtitle-1 font-weight-medium">{{ getTokenSymbol(token.address) }}</div>
-          <div class="text-caption text-grey">Balance: {{ getFormattedBalance(token) }}</div>
-          <div class="text-caption price-text">{{ getFormattedPrice(token) }}</div>
+      <!-- Token Header -->
+      <div class="token-header mb-3">
+        <div class="d-flex align-center">
+          <v-avatar size="44" class="token-avatar mr-3">
+            <v-img :src="getTokenLogo(token.address)" @error="handleImageError" />
+          </v-avatar>
+          
+          <div class="token-details flex-grow-1">
+            <div class="text-subtitle-1 font-weight-medium">{{ getTokenSymbol(token.address) }}</div>
+            <div class="d-flex align-center">
+              <div class="text-caption text-grey mr-2">Balance: {{ getFormattedBalance(token) }}</div>
+              <v-chip size="x-small" color="primary" variant="flat" class="price-chip">
+                {{ getFormattedPrice(token) }}
+              </v-chip>
+            </div>
+          </div>
+          
+          <v-btn
+            icon 
+            size="small"
+            variant="text" 
+            color="error"
+            @click="$emit('remove')"
+            class="remove-btn"
+            density="compact"
+          >
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
         </div>
       </div>
 
       <!-- Amount Input -->
       <div class="token-amount">
-        <div class="amount-field-container">
-          <v-text-field
-            v-model="localDisplayAmount"
-            variant="outlined"
-            density="compact"
-            hide-details
-            type="number"
-            min="0"
-            class="amount-input"
-            placeholder="0.00"
-            @input="handleAmountChange"
-          ></v-text-field>
-          
-          <div class="token-actions">
-            <v-btn
-              size="small"
+        <div class="d-flex align-center">
+          <div class="amount-field-container flex-grow-1">
+            <v-text-field
+              v-model="localDisplayAmount"
               variant="outlined"
-              color="primary"
-              @click="$emit('max')"
-              class="max-btn"
               density="compact"
-            >MAX</v-btn>
-            <v-btn
-              icon 
-              size="small"
-              variant="text" 
-              color="error"
-              @click="$emit('remove')"
-              class="remove-btn"
-              density="compact"
-            >
-              <v-icon>mdi-close</v-icon>
-            </v-btn>
+              hide-details
+              type="number"
+              min="0"
+              class="amount-input"
+              placeholder="0.00"
+              @input="handleAmountChange"
+            ></v-text-field>
           </div>
+          
+          <v-btn
+            size="small"
+            variant="tonal"
+            color="primary"
+            @click="$emit('max')"
+            class="max-btn ml-2"
+            density="compact"
+          >
+            MAX
+          </v-btn>
         </div>
         
         <!-- Token Value -->
-        <div class="token-value">
+        <div class="token-value mt-2">
           <span class="text-caption value-text">≈ {{ calculateValueUSD }}</span>
         </div>
       </div>
@@ -89,14 +98,14 @@ const emit = defineEmits(['max', 'remove', 'amount-change']);
 const tokenStore = useTokenStore();
 
 /**
- * localDisplayAmount: 用來顯示在輸入框的「普通小數數量」(非 wei)
+ * localDisplayAmount: Used to display in the input field as "normal decimal amount" (not wei)
  * 
- * props.token.amount: 來自父層的wei值
+ * props.token.amount: wei value from parent component
  */
 const localDisplayAmount = ref('');
 
 /**
- * 當父層 token.amount(wei) 改變時，把它轉成普通小數顯示
+ * When parent's token.amount(wei) changes, convert it to normal decimal for display
  */
 watch(() => props.token?.amount, (newWei) => {
   if (!newWei) {
@@ -107,12 +116,12 @@ watch(() => props.token?.amount, (newWei) => {
   const decimals = tokenInfo.decimals ?? 18;
 
   const realAmount = parseFloat(newWei) / 10 ** decimals;
-  // 顯示時保留幾位小數隨你
+  // Display with appropriate decimal places
   localDisplayAmount.value = realAmount.toString();
 }, { immediate: true });
 
 /**
- * 當輸入框改變時，將普通小數數量轉成 wei emit出去
+ * When input field changes, convert normal decimal amount to wei and emit
  */
 function handleAmountChange(e) {
   const inputValue = parseFloat(e.target.value || '0');
@@ -121,14 +130,14 @@ function handleAmountChange(e) {
   const tokenInfo = tokenStore.allTokens[props.token?.address?.toLowerCase()] || {};
   const decimals = tokenInfo.decimals ?? 18;
 
-  // 轉回wei (大整數)
+  // Convert back to wei (big integer)
   const newWei = (inputValue * 10 ** decimals).toFixed(0);
 
   emit('amount-change', newWei);
 }
 
 /**
- * 依賴 tokenStore 來取得 token logo
+ * Use tokenStore to get token logo
  */
 function getTokenLogo(address) {
   if (!address) return 'https://via.placeholder.com/40';
@@ -151,7 +160,7 @@ function getTokenSymbol(address) {
 }
 
 /**
- * 顯示餘額(wei->普通數量)
+ * Display balance (wei -> normal amount)
  */
 function getFormattedBalance(token) {
   if (!token?.address) return '0';
@@ -171,7 +180,7 @@ function getFormattedBalance(token) {
 }
 
 /**
- * 顯示單位價格
+ * Display unit price
  */
 function getFormattedPrice(token) {
   if (!token?.price) return '$0.00';
@@ -187,9 +196,9 @@ function getFormattedPrice(token) {
 }
 
 /**
- * 計算顯示USD:
- * localDisplayAmount(普通數量) * token.price
- * 最多小數點三位
+ * Calculate USD display:
+ * localDisplayAmount(normal amount) * token.price
+ * Maximum 3 decimal places
  */
 const calculateValueUSD = computed(() => {
   if (!props.token?.price || !localDisplayAmount.value) return '$0.00';
@@ -214,10 +223,10 @@ function handleImageError(event) {
 
 <style scoped>
 .token-card {
-  border-radius: 12px;
+  border-radius: 16px;
   overflow: hidden;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
-  margin-bottom: 12px;
+  margin-bottom: 16px;
   border: 1px solid rgba(0, 0, 0, 0.08);
   background-color: #ffffff;
 }
@@ -230,15 +239,6 @@ function handleImageError(event) {
 
 .card-content {
   padding: 16px;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  align-items: center;
-}
-
-.token-info {
-  display: flex;
-  align-items: center;
 }
 
 .token-avatar {
@@ -251,14 +251,9 @@ function handleImageError(event) {
   flex-direction: column;
 }
 
-.price-text {
-  color: var(--v-theme-primary);
-  margin-top: 2px;
-}
-
-.token-amount {
-  display: flex;
-  flex-direction: column;
+.price-chip {
+  font-size: 10px;
+  font-weight: 500;
 }
 
 .amount-field-container {
@@ -275,17 +270,11 @@ function handleImageError(event) {
   --v-field-border-width: 1px !important;
 }
 
-.token-actions {
-  display: flex;
-  align-items: center;
-  margin-left: 8px;
-}
-
 .max-btn {
   font-size: 0.7rem;
   font-weight: bold;
-  margin-right: 4px;
   letter-spacing: 0.5px;
+  height: 32px;
 }
 
 .remove-btn {
@@ -299,7 +288,6 @@ function handleImageError(event) {
 .token-value {
   display: flex;
   justify-content: flex-end;
-  margin-top: 6px;
 }
 
 .value-text {
@@ -309,8 +297,7 @@ function handleImageError(event) {
 
 @media (max-width: 600px) {
   .card-content {
-    grid-template-columns: 1fr;
-    gap: 16px;
+    padding: 12px;
   }
 }
 </style>
