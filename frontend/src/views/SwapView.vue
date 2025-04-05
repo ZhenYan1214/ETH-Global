@@ -34,8 +34,8 @@
 
         <v-card-text class="pa-4">
           <!-- From Token Section -->
-          <section class="from-section mb-5">
-            <div class="d-flex justify-space-between align-center mb-3">
+          <section class="from-section mb-4">
+            <div class="d-flex justify-space-between align-center mb-2">
               <h3 class="text-subtitle-1 font-weight-medium">Input Token</h3>
               <v-btn 
                 variant="text" 
@@ -48,210 +48,94 @@
                 {{ tokenStore.selectedFromTokens.length > 0 ? 'Selected ' + tokenStore.selectedFromTokens.length + ' tokens' : 'Select Token' }}
                 <v-icon size="small" class="ml-1">mdi-chevron-down</v-icon>
               </v-btn>
-            </div>
+                    </div>
 
             <!-- Single Select Mode -->
-            <v-card 
-              v-if="tokenStore.selectedFromTokens.length === 0" 
-              class="token-card mb-2" 
-              elevation="0" 
-              variant="outlined"
-              :class="{'empty-card': !tokenStore.selectedFromToken}"
-            >
-              <div v-if="tokenStore.selectedFromToken" class="d-flex align-center pa-3">
-                <v-avatar size="40" class="mr-3">
-                  <v-img 
-                    :src="getTokenLogo(tokenStore.selectedFromToken.address)" 
-                    @error="handleImageError"
-                  />
-                    </v-avatar>
-                <div class="flex-grow-1">
-                  <div class="d-flex justify-space-between align-center mb-1">
-                    <div>
-                      <div class="text-subtitle-1 font-weight-bold">{{ getTokenSymbol(tokenStore.selectedFromToken.address) }}</div>
-                      <div class="text-caption text-grey">{{ getTokenName(tokenStore.selectedFromToken.address) }}</div>
-                    </div>
-                    <v-chip 
-                      v-if="tokenStore.selectedFromToken.price" 
-                      size="small" 
-                      color="primary" 
-                      variant="flat"
-                      class="price-chip"
-                    >
-                      ${{ formatPrice(tokenStore.selectedFromToken.price) }}
-                    </v-chip>
+            <div v-if="!tokenStore.selectedFromTokens.length">
+              <div class="single-token-container">
+                <simple-token-preview
+                  v-if="tokenStore.selectedFromToken"
+                  :token="tokenStore.selectedFromToken"
+                  :amount="tokenStore.fromAmount"
+                  @amount-change="tokenStore.fromAmount = $event; tokenStore.calculateToAmount()"
+                  @select="showFromTokenList = true"
+                />
+                <v-card v-else class="empty-preview-card pa-4" variant="outlined" @click="showFromTokenList = true">
+                  <div class="text-center cursor-pointer">
+                    <v-icon size="large" class="empty-icon">mdi-wallet-outline</v-icon>
+                    <div class="text-body-1 mt-2">Select a token</div>
                   </div>
-                  <div class="position-relative mt-2">
-                    <v-text-field
-                      v-model="tokenStore.fromAmount"
-                      :label="tokenStore.selectedFromToken ? getTokenSymbol(tokenStore.selectedFromToken.address) : 'Amount'"
-                      variant="underlined"
-                      hide-details
-                      density="compact"
-                      type="number"
-                      min="0"
-                      class="amount-field"
-                    ></v-text-field>
-                    <v-btn
-                      v-if="tokenStore.selectedFromToken"
-                      size="x-small"
-                      density="comfortable"
-                      variant="text"
-                      color="primary"
-                      class="max-btn"
-                      @click="setMaxAmount(tokenStore.selectedFromToken.address)"
-                    >
-                      MAX
-                    </v-btn>
+                </v-card>
                   </div>
                 </div>
-              </div>
-              <div v-else class="text-center py-5 empty-token-placeholder">
-                <v-icon size="large" color="grey-lighten-1">mdi-wallet-outline</v-icon>
-                <div class="text-body-2 text-grey mt-2">Please select a token</div>
-          </div>
-            </v-card>
 
             <!-- Multi-Select Mode -->
-            <v-card v-else class="token-card mb-2" elevation="0" variant="outlined">
-              <v-list density="compact" class="py-0">
-                <v-list-item 
-                  v-for="token in tokenStore.selectedFromTokens" 
-                  :key="token.address"
-                  class="token-list-item py-2"
-                  density="compact"
-                >
-                  <template v-slot:prepend>
-                    <v-avatar size="32" class="mr-2">
-                      <v-img :src="getTokenLogo(token.address)" @error="handleImageError" />
-                    </v-avatar>
-                  </template>
-                  
-                  <v-list-item-title class="d-flex justify-space-between align-center">
-                    <span class="font-weight-medium">{{ getTokenSymbol(token.address) }}</span>
-                    <span class="text-caption text-grey-darken-1">
-                      {{ getDisplayBalance(token) }} available
-                    </span>
-                  </v-list-item-title>
-                  
-                  <template v-slot:append>
-                    <div class="d-flex align-center">
-                      <div class="position-relative">
-              <v-text-field
-                          v-model="token.amount"
-                          :label="getTokenSymbol(token.address)"
-                variant="outlined"
-                          density="compact"
-                hide-details
-                          type="number"
-                          min="0"
-                          class="amount-input mr-2"
-                          style="width: 100px"
-                          @input="updateFromTokenAmount(token.address, $event.target.value)"
-                        ></v-text-field>
-                        <v-btn
-                          size="x-small"
-                          density="comfortable"
-                          variant="text"
-                          color="primary"
-                          class="max-btn-small"
-                          @click="setMaxAmount(token.address)"
-                        >
-                          MAX
-                        </v-btn>
-                      </div>
-                  <v-btn
-                        icon 
-                        size="x-small" 
-                        variant="text" 
-                        color="error"
-                        @click="tokenStore.toggleFromToken(token.address)"
-                        class="ml-1"
-                      >
-                        <v-icon>mdi-close</v-icon>
-                  </v-btn>
-                    </div>
-                </template>
-                </v-list-item>
-              </v-list>
+            <div v-else class="token-grid">
+              <v-row>
+                <v-col v-for="token in tokenStore.selectedFromTokens" :key="token.address" cols="12">
+                  <token-card 
+                    :token="token" 
+                    @max="setMaxAmount(token.address)" 
+                    @remove="tokenStore.toggleFromToken(token.address)"
+                    @amount-change="updateFromTokenAmount(token.address, $event)" 
+                  />
+                </v-col>
+              </v-row>
               
               <!-- Total Value Display -->
-              <div class="total-value-container px-4 py-3">
-                <span class="text-body-2 font-weight-medium">Total Value</span>
-                <span class="text-subtitle-1 font-weight-bold text-primary">
-                  ${{ formatPrice(tokenStore.totalFromAmount) }}
-                </span>
+              <div class="total-value-container mt-4 pa-3">
+                <span class="text-subtitle-2">Total Value</span>
+                <span class="text-h6 font-weight-bold text-primary">${{ formatPrice(tokenStore.totalFromAmount) }}</span>
+          </div>
             </div>
-            </v-card>
           </section>
 
             <!-- Swap Arrow -->
-          <div class="swap-arrow-container my-4">
+          <div class="swap-arrow-container">
             <v-btn icon size="small" @click="swapTokens" class="swap-arrow-btn" elevation="1">
                 <v-icon>mdi-swap-vertical</v-icon>
               </v-btn>
             </div>
 
-          <!-- To Token Input -->
-          <section class="to-section mb-5">
-            <div class="d-flex justify-space-between align-center mb-3">
+          <!-- To Token Section -->
+          <section class="to-section mb-4">
+            <div class="d-flex justify-space-between align-center mb-2">
               <h3 class="text-subtitle-1 font-weight-medium">You Will Receive</h3>
             </div>
             
-              <v-text-field
-              v-model="tokenStore.toAmount"
-                label="To"
-                variant="outlined"
-              type="number"
-              min="0"
-              readonly
-              class="to-amount-field"
-            >
-              <template v-slot:append>
-                  <v-btn
-                    class="token-select-btn"
-                  @click="toTokenDialog = true"
-                  variant="tonal"
-                  rounded
-                >
-                  <div v-if="tokenStore.selectedToToken" class="d-flex align-center">
-                    <v-avatar size="24" class="mr-1">
-                      <v-img
-                        :src="tokenStore.selectedToToken.logoURI || 'https://via.placeholder.com/24'"
-                        @error="handleImageError"
-                      />
-                    </v-avatar>
-                    <span class="token-symbol ml-1">{{ tokenStore.selectedToToken.symbol || '???' }}</span>
-                  </div>
-                  <span v-else>Select</span>
-                  <v-icon size="small" class="ml-1">mdi-chevron-down</v-icon>
-                  </v-btn>
-                </template>
-              </v-text-field>
+            <div class="single-token-container">
+              <simple-token-preview
+                v-if="tokenStore.selectedToToken"
+                :token="tokenStore.selectedToToken"
+                :amount="tokenStore.toAmount"
+                :showClearButton="false"
+                @select="toTokenDialog = true"
+              />
+              <v-card v-else class="empty-preview-card pa-4" variant="outlined" @click="toTokenDialog = true">
+                <div class="text-center cursor-pointer">
+                  <v-icon size="large" class="empty-icon">mdi-plus-circle-outline</v-icon>
+                  <div class="text-body-1 mt-2">Select a token</div>
+                </div>
+              </v-card>
+            </div>
           </section>
 
-          <!-- Wallet Information -->
-          <div v-if="walletStore.isConnected" class="info-box my-3">
-            <div class="d-flex align-center">
-              <v-icon size="small" class="mr-1">mdi-wallet</v-icon>
-              <span class="text-caption">{{ walletStore.formattedAddress }}</span>
-            </div>
+          <!-- Wallet Connection -->
+          <div v-if="walletStore.isConnected" class="wallet-info mb-3">
+            <v-icon size="small" class="mr-1">mdi-wallet</v-icon>
+            <span class="text-caption">{{ walletStore.formattedAddress }}</span>
           </div>
 
           <!-- Swap Button -->
-          <div class="swap-btn-container mt-5">
-            <!-- Show Swap Progress Indicator -->
-            <div v-if="isSwapping" class="swap-progress mb-3 w-100">
-              <div class="d-flex flex-column">
-                <div class="d-flex justify-space-between mb-1">
-                  <span class="text-caption">{{ swapStep === 'approving' ? 'Approving Token Usage...' : 'Performing Swap...' }}</span>
-                  <span class="text-caption">{{ swapStep === 'approving' ? '1/2' : '2/2' }}</span>
-                </div>
-                <v-progress-linear indeterminate rounded color="primary" height="4"></v-progress-linear>
+          <div class="swap-btn-container mt-3">
+            <div v-if="isSwapping" class="swap-progress mb-2">
+              <div class="d-flex justify-space-between mb-1">
+                <span class="text-caption">{{ swapStep === 'approving' ? 'Approving...' : 'Swapping...' }}</span>
+                <span class="text-caption">{{ swapStep === 'approving' ? '1/2' : '2/2' }}</span>
               </div>
+              <v-progress-linear indeterminate rounded color="primary" height="4"></v-progress-linear>
             </div>
             
-            <!-- Swap Button -->
           <v-btn
             block
               class="swap-btn"
@@ -263,7 +147,6 @@
               {{ swapButtonText }}
           </v-btn>
             
-            <!-- Error Message -->
             <div v-if="swapError" class="error-message mt-2 text-caption text-center">
               {{ swapError }}
             </div>
@@ -292,11 +175,10 @@
           </v-btn>
         </v-toolbar>
         
-        <!-- Search Field -->
         <div class="pa-3">
           <v-text-field
             v-model="fromTokenSearchText"
-            label="Search Token Symbol, Name, or Address"
+            label="Search Token"
             variant="outlined"
             density="compact"
             prepend-inner-icon="mdi-magnify"
@@ -305,19 +187,16 @@
           ></v-text-field>
         </div>
         
-        <!-- Loading State -->
         <v-card-text v-if="tokenStore.isLoading" class="text-center pa-4">
           <v-progress-circular indeterminate color="primary"></v-progress-circular>
           <div class="mt-2">Loading...</div>
         </v-card-text>
 
-        <!-- No Token Prompt -->
         <v-card-text v-else-if="filteredFromTokens.length === 0" class="text-center pa-4">
           <v-icon size="large" color="grey-lighten-1">mdi-alert-circle-outline</v-icon>
           <div class="mt-2">No matching tokens</div>
         </v-card-text>
 
-        <!-- Token List -->
         <v-card-text v-else class="pa-0">
           <v-list class="token-list py-0">
             <v-list-item
@@ -351,7 +230,7 @@
               
               <template v-slot:append>
                 <div class="d-flex flex-column align-end">
-                  <span class="text-body-2">{{ getFormattedBalance(token) }} {{ getTokenSymbol(token.address) }}</span>
+                  <span class="text-body-2">{{ getFormattedBalance(token) }}</span>
                   <span v-if="token.price" class="text-caption text-grey">{{ getFormattedPrice(token) }}</span>
                 </div>
               </template>
@@ -365,10 +244,7 @@
     <v-dialog v-model="toTokenDialog" max-width="500">
       <v-card class="token-dialog">
         <v-toolbar color="primary" density="compact">
-          <v-toolbar-title class="text-white">
-            <v-icon class="mr-2">mdi-earth</v-icon>
-            All Tokens
-          </v-toolbar-title>
+          <v-toolbar-title class="text-white">Select Token</v-toolbar-title>
           <v-spacer></v-spacer>
           <v-btn icon variant="text" color="white" @click="toTokenDialog = false">
             <v-icon>mdi-close</v-icon>
@@ -387,51 +263,43 @@
           ></v-text-field>
         </div>
 
-        <!-- Loading State -->
         <v-card-text v-if="tokenStore.isLoadingAllTokens" class="text-center pa-4">
           <v-progress-circular indeterminate color="primary"></v-progress-circular>
           <div class="mt-2">Loading...</div>
         </v-card-text>
 
-        <!-- No Matching Result Prompt -->
         <v-card-text v-else-if="Object.keys(filteredAllTokens).length === 0" class="text-center pa-4">
           <v-icon size="large" color="grey-lighten-1">mdi-alert-circle-outline</v-icon>
           <div class="mt-2">No matching tokens</div>
         </v-card-text>
 
-        <!-- Token Grid -->
         <v-card-text v-else class="pa-3">
           <v-row>
             <v-col
               v-for="(token, address) in filteredAllTokens"
               :key="address"
-              cols="12" sm="6"
+              cols="12"
             >
               <v-card
-                class="token-card"
+                class="token-selection-card"
                 :class="{'selected-token': tokenStore.selectedToToken?.address === address}"
                 variant="outlined"
                 @click="selectToToken(address)"
               >
-                <div class="d-flex pa-2">
-                  <v-avatar size="36" class="mr-2">
-                    <v-img
-                      :src="token.logoURI || 'https://via.placeholder.com/36'"
-                      @error="handleImageError"
-                    />
+                <div class="token-selection-content">
+                  <div class="token-selection-left">
+                    <v-avatar size="40" class="token-avatar">
+                      <v-img :src="token.logoURI || 'https://via.placeholder.com/40'" @error="handleImageError" />
                 </v-avatar>
-                  <div class="flex-grow-1">
-                    <div class="d-flex align-center">
-                      <strong class="mr-2">{{ token.symbol || '???' }}</strong>
-                      <v-chip
-                        v-if="token.price"
-                        size="x-small"
-                        color="primary"
-                        variant="flat"
-                      >${{ formatPrice(token.price) }}</v-chip>
+                    <div class="token-selection-info">
+                      <div class="token-selection-name">
+                        <span class="font-weight-medium">{{ token.symbol || '???' }}</span>
+                        <span class="text-caption text-grey">{{ token.name || 'Unknown Token' }}</span>
+                      </div>
                     </div>
-                    <div class="text-caption text-truncate" style="max-width: 150px">{{ token.name || 'Unknown Token' }}</div>
-                    <div class="text-caption text-grey">{{ formatAddress(address) }}</div>
+                  </div>
+                  <div class="token-selection-price">
+                    <v-chip v-if="token.price" size="small" color="primary" variant="flat" class="token-price-chip">${{ formatPrice(token.price) }}</v-chip>
                   </div>
                 </div>
               </v-card>
@@ -450,6 +318,9 @@ import { useTokenStore } from '../store/tokens'
 import { useWalletStore } from '../store/wallet'
 import { useMainStore } from '../store/main'
 import { useRouter } from 'vue-router'
+import TokenPreview from '../components/TokenPreview.vue'
+import TokenCard from '../components/TokenCard.vue'
+import SimpleTokenPreview from '../components/SimpleTokenPreview.vue'
 
 // Initialize stores
 const tokenStore = useTokenStore()
@@ -945,9 +816,44 @@ function getDisplayBalance(token) {
 
 .token-card {
   border-radius: 12px;
-  transition: all 0.2s ease-in-out;
-  border: 1px solid rgba(255, 153, 153, 0.2);
   overflow: hidden;
+}
+
+.token-grid-card {
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.token-grid-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.token-price-bar {
+  background-color: rgba(0, 0, 0, 0.02);
+  border-top: 1px solid rgba(0, 0, 0, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.token-action-buttons {
+  position: absolute;
+  right: 5px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+}
+
+.token-max-btn {
+  font-size: 10px;
+  margin-right: 4px;
+}
+
+.token-remove-btn {
+  min-width: 20px;
+  height: 20px;
 }
 
 .swap-arrow-container {
@@ -1028,11 +934,12 @@ function getDisplayBalance(token) {
 }
 
 .total-value-container {
-  background-color: rgba(255, 153, 153, 0.05);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  border-top: 1px solid rgba(255, 153, 153, 0.1);
+  background-color: rgba(var(--v-theme-primary), 0.05);
+  border-radius: 8px;
+  border: 1px dashed rgba(var(--v-theme-primary), 0.2);
 }
 
 .price-chip {
@@ -1085,5 +992,95 @@ function getDisplayBalance(token) {
   .swap-card {
     border-radius: 16px;
   }
+}
+
+.token-grid {
+  padding: 8px;
+  background-color: rgba(var(--v-theme-primary), 0.02);
+  border-radius: 12px;
+}
+
+.token-selection-card {
+  border-radius: 12px;
+  margin-bottom: 8px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  cursor: pointer;
+  border: 1px solid rgba(0, 0, 0, 0.09);
+}
+
+.token-selection-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: rgba(var(--v-theme-primary), 0.3);
+}
+
+.token-selection-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+}
+
+.token-selection-left {
+  display: flex;
+  align-items: center;
+}
+
+.token-avatar {
+  margin-right: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.token-selection-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.token-selection-name {
+  display: flex;
+  flex-direction: column;
+}
+
+.token-selection-price {
+  display: flex;
+  align-items: center;
+}
+
+.token-price-chip {
+  font-weight: 500;
+}
+
+.selected-token {
+  background-color: rgba(var(--v-theme-primary), 0.08) !important;
+  border-color: rgba(var(--v-theme-primary), 0.3) !important;
+  box-shadow: 0 2px 8px rgba(var(--v-theme-primary), 0.15) !important;
+}
+
+.single-token-container {
+  background-color: rgba(var(--v-theme-primary), 0.02);
+  border-radius: 12px;
+  padding: 8px;
+}
+
+.empty-preview-card {
+  border-radius: 12px;
+  border: 1px dashed rgba(var(--v-theme-primary), 0.2);
+  min-height: 100px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.empty-preview-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  background-color: rgba(var(--v-theme-primary), 0.03);
+}
+
+.empty-icon {
+  color: rgba(var(--v-theme-primary), 0.6);
+  margin-bottom: 8px;
+}
+
+.cursor-pointer {
+  cursor: pointer;
 }
 </style> 
