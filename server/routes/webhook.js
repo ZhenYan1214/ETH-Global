@@ -40,16 +40,18 @@ function handleWebhookEvents(events, wss) {
   });
 }
 
-
 // 查詢事件的函數
 async function queryEvents(eventQuery, offset = 0, limit = 10) {
     try {
-        const hostname = process.env.MULTIBAAS_API_URL;
+        let hostname = process.env.MULTIBAAS_API_URL;
         const apiKey = process.env.MULTIBAAS_API_KEY;
 
         if (!hostname || !apiKey) {
             throw new Error('Missing MultiBaas hostname or API key in environment variables');
         }
+
+        // 移除協議部分（如果存在）
+        hostname = hostname.replace(/^https?:\/\//, '');
 
         const query = new URLSearchParams({
             offset: offset.toString(),
@@ -57,6 +59,7 @@ async function queryEvents(eventQuery, offset = 0, limit = 10) {
         }).toString();
 
         const url = `https://${hostname}/api/v0/queries/${eventQuery}/results?${query}`;
+        console.log('Querying MultiBaas API:', url);
         const response = await axios.get(url, {
             headers: {
                 Authorization: `Bearer ${apiKey}`
@@ -65,6 +68,11 @@ async function queryEvents(eventQuery, offset = 0, limit = 10) {
 
         return response.data;
     } catch (error) {
+        console.error('Error in queryEvents:', {
+            message: error.message,
+            status: error.response?.status,
+            data: error.response?.data
+        });
         throw new Error(`Failed to query events: ${error.message}`);
     }
 }
@@ -94,7 +102,6 @@ router.post("/multibaas", (req, res) => {
       res.status(500).json({ error: "Error processing webhook" });
   }
 });
-
 
 // 查詢事件的端點
 router.get("/events/:eventQuery", async (req, res) => {
