@@ -58,7 +58,7 @@
         <div class="line-cell">
           <div class="line" :class="{ completed: step >= 4 }"></div>
           <template v-if="step === 4">
-            <img src="@/assets/load.gif" alt="Piggy" class="piggy" />
+            <img src="@/assets/load.gif" alt="Loading" class="piggy" />
           </template>
         </div>
 
@@ -88,13 +88,20 @@
         </div>
         <div class="label-cell" style="grid-column: 5;">
           <div class="label">完成存款</div>
+          <!-- 顯示Transaction Receipt信息，但僅當交易成功時 -->
+          <div v-if="receipt && status === 'success'" class="receipt-info">
+            <span class="receipt-text">收據已確認</span>
+          </div>
         </div>
       </div>
 
       <!-- OK 按鈕 -->
       <div class="text-center py-4">
-        <v-btn color="#FFB6C1" text class="px-10 text-white rounded-full" @click="close">
+        <v-btn v-if="status !== 'pending'" color="#FFB6C1" text class="px-10 text-white rounded-full" @click="close">
           OK
+        </v-btn>
+        <v-btn v-else color="#FFB6C1" text class="px-10 text-white rounded-full" disabled>
+          处理中...
         </v-btn>
       </div>
     </v-card>
@@ -125,6 +132,10 @@ const props = defineProps({
     type: Number,
     default: 1,
   },
+  receipt: {
+    type: Object,
+    default: null
+  }
 })
 const emit = defineEmits(['update:visible', 'done'])
 const step = ref(props.initialStep)
@@ -143,14 +154,30 @@ const close = () => {
   step.value = 1
 }
 
-// 當視窗打開時自動開始跑步驟
+// 監聽 receipt，當收到時才顯示完成步驟
+watch(() => props.receipt, (newReceipt) => {
+  if (newReceipt && props.status === 'success') {
+    console.log('交易收據已接收', newReceipt)
+    // 確保所有步驟完成
+    step.value = 5
+    
+    // 延遲關閉，讓用戶看到完成的動畫
+    setTimeout(() => {
+      console.log('交易完成，關閉狀態對話框，發出 done 事件')
+      close()
+    }, 2000)
+  }
+}, { deep: true })
+
+// 修改自動步驟前進，但停在第4步等待交易確認
 watch(
   () => props.visible,
   (val) => {
     if (val) {
       step.value = 1
       const interval = setInterval(() => {
-        if (step.value < 5 && props.visible) {
+        // 只前進到第4步，等待交易收據
+        if (step.value < 4 && props.visible) {
           step.value += 1
         } else {
           clearInterval(interval)
@@ -160,14 +187,19 @@ watch(
   }
 )
 
-// 當 step 達到 5 時，自動關閉並觸發 done 事件
+// 監聽交易狀態變化
 watch(
-  () => step.value,
-  (newStep) => {
-    if (newStep === 5) {
+  () => props.status,
+  (newStatus) => {
+    if (newStatus === 'success' && props.receipt) {
+      // 如果已經有收據並且狀態是成功，直接前進到最後步驟
+      step.value = 5
       setTimeout(() => {
-        close() // 進度完成後自動關閉
-      }, 1000) // 稍微延遲 1 秒，讓用戶看到最後一步完成
+        close()
+      }, 2000)
+    } else if (newStatus === 'error') {
+      // 如果交易錯誤，保持在當前步驟，但不自動關閉
+      console.log('交易發生錯誤')
     }
   }
 )
@@ -257,5 +289,15 @@ watch(
 }
 .link:hover {
   text-decoration: underline;
+}
+.receipt-info {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #4CAF50;
+}
+.receipt-text {
+  background-color: rgba(76, 175, 80, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 </style>
