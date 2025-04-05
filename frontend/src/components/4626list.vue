@@ -154,7 +154,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useTokenStore } from '../store/tokens'
 import { useWalletStore } from '../store/wallet'
 import { useRouter } from 'vue-router'
@@ -187,6 +187,9 @@ const transactionReceipt = ref(null)
 const receivedAmount = ref('0')
 const errorMessage = ref('')
 const vaultStore = useVaultStore()
+
+// 聲明在資料區域的頂部
+let vaultStoreSubscription = null
 
 // 監聽對話框顯示狀態
 watch(() => props.modelValue, async (newValue) => {
@@ -413,63 +416,147 @@ function goToVault() {
 
 // 處理交易狀態顯示
 function handleShowTransactionStatus() {
-  console.log('顯示交易狀態')
-  showTransactionStatusDialog.value = true
-  transactionStatus.value = 'pending'
-  transactionMessage.value = '交易處理中，請稍候...'
-  transactionHash.value = ''
-  transactionReceipt.value = null
-  
-  // 監聽交易狀態變化
-  vaultStore.$subscribe((mutation, state) => {
-    console.log('Vault store 狀態變化:', state.depositStatus, state.transactionHash, state.depositReceipt)
+  try {
+    console.log('[4626list] 顯示交易狀態')
+    showTransactionStatusDialog.value = true
+    transactionStatus.value = 'pending'
+    transactionMessage.value = '交易處理中，請稍候...'
+    transactionHash.value = ''
+    transactionReceipt.value = null
     
-    if (state.depositStatus === 'processing' && state.transactionHash) {
-      transactionStatus.value = 'pending'
-      transactionMessage.value = '交易已提交，等待確認...'
-      transactionHash.value = state.transactionHash
-    } 
-    else if (state.depositStatus === 'success') {
-      transactionStatus.value = 'success'
-      transactionMessage.value = '交易已確認！'
-      
-      // 只有在收到收據後才設置 receipt
-      if (state.depositReceipt) {
-        console.log('收到交易收據:', state.depositReceipt)
-        transactionReceipt.value = state.depositReceipt
-        
-        // 設置接收到的金額，用於完成頁面顯示
-        if (vaultStore.depositPreview && vaultStore.depositPreview.dstAmount) {
-          receivedAmount.value = formatDisplayAmount(vaultStore.depositPreview.dstAmount)
-        }
+    // 先取消現有訂閱，避免重複
+    if (vaultStoreSubscription) {
+      try {
+        vaultStoreSubscription()
+        console.log('[4626list] 已取消舊的 vaultStore 訂閱')
+      } catch (error) {
+        console.error('[4626list] 取消舊訂閱時發生錯誤:', error)
       }
-    } 
-    else if (state.depositStatus === 'error') {
-      transactionStatus.value = 'error'
-      transactionMessage.value = `交易失敗: ${state.error || '未知錯誤'}`
+      vaultStoreSubscription = null
     }
-  })
+    
+    // 創建新的訂閱
+    console.log('[4626list] 創建新的 vaultStore 訂閱')
+    try {
+      vaultStoreSubscription = vaultStore.$subscribe((mutation, state) => {
+        try {
+          console.log('[4626list] Vault store 狀態變化:', {
+            depositStatus: state.depositStatus,
+            transactionHash: state.transactionHash,
+            hasReceipt: state.depositReceipt ? '有' : '無',
+            error: state.error
+          })
+          
+          // 檢查狀態變化並更新 TransactionStatus 組件的顯示
+          if (state.depositStatus === 'processing' && state.transactionHash) {
+            console.log('[4626list] 交易處理中...')
+            transactionStatus.value = 'pending'
+            transactionMessage.value = '交易已提交，等待確認...'
+            transactionHash.value = state.transactionHash
+          } 
+          else if (state.depositStatus === 'success') {
+            console.log('[4626list] 交易成功!')
+            transactionStatus.value = 'success'
+            transactionMessage.value = '交易已確認！'
+            
+            // 只有在收到收據後才設置 receipt
+            if (state.depositReceipt) {
+              console.log('[4626list] 收到交易收據:', state.depositReceipt)
+              try {
+                // 明確轉換為新物件，確保觸發 Vue 的響應式
+                const receiptCopy = JSON.parse(JSON.stringify(state.depositReceipt))
+                transactionReceipt.value = receiptCopy
+                
+                // 設置接收到的金額，用於完成頁面顯示
+                if (state.depositPreview && state.depositPreview.dstAmount) {
+                  receivedAmount.value = formatDisplayAmount(state.depositPreview.dstAmount)
+                  console.log('[4626list] 設置接收金額:', receivedAmount.value)
+                }
+              } catch (receiptError) {
+                console.error('[4626list] 處理交易收據時發生錯誤:', receiptError)
+              }
+            } else {
+              console.warn('[4626list] 交易成功但未收到收據')
+            }
+          } 
+          else if (state.depositStatus === 'error') {
+            console.log('[4626list] 交易失敗:', state.error)
+            transactionStatus.value = 'error'
+            transactionMessage.value = `交易失敗: ${state.error || '未知錯誤'}`
+          }
+        } catch (subscribeError) {
+          console.error('[4626list] 訂閱回調中發生錯誤:', subscribeError)
+        }
+      })
+    } catch (subscriptionError) {
+      console.error('[4626list] 創建訂閱時發生錯誤:', subscriptionError)
+    }
+  } catch (error) {
+    console.error('[4626list] 顯示交易狀態時發生錯誤:', error)
+  }
 }
 
 // 處理交易完成後的行為
 function handleTransactionDone() {
-  console.log('交易完成，狀態:', transactionStatus.value)
-  
-  // 檢查交易狀態
-  if (transactionStatus.value === 'success') {
-    console.log('顯示完成頁面')
-    showFinishDialog.value = true
+  try {
+    console.log('[4626list] 交易過程完成，狀態:', transactionStatus.value)
+    
+    // 取消 vaultStore 訂閱
+    if (vaultStoreSubscription) {
+      try {
+        vaultStoreSubscription()
+        vaultStoreSubscription = null
+        console.log('[4626list] 已取消 vaultStore 訂閱')
+      } catch (error) {
+        console.error('[4626list] 取消訂閱時發生錯誤:', error)
+      }
+    }
+    
+    // 檢查交易狀態
+    if (transactionStatus.value === 'success') {
+      console.log('[4626list] 顯示完成頁面')
+      
+      // 確保關閉交易狀態對話框後再顯示完成頁面
+      setTimeout(() => {
+        try {
+          showFinishDialog.value = true
+          console.log('[4626list] 完成頁面已顯示')
+        } catch (error) {
+          console.error('[4626list] 顯示完成頁面時發生錯誤:', error)
+        }
+      }, 300)
+    }
+    
+    // 重置交易相關狀態
+    transactionStatus.value = 'pending'
+    transactionMessage.value = '交易處理中，請稍候...'
+    transactionHash.value = ''
+    transactionReceipt.value = null
+    
+    // 重置 vaultStore
+    try {
+      console.log('[4626list] 重置 vaultStore')
+      vaultStore.$reset()
+    } catch (error) {
+      console.error('[4626list] 重置 vaultStore 時發生錯誤:', error)
+    }
+  } catch (error) {
+    console.error('[4626list] 處理交易完成事件時發生錯誤:', error)
   }
-  
-  // 重置交易相關狀態
-  transactionStatus.value = 'pending'
-  transactionMessage.value = '交易處理中，請稍候...'
-  transactionHash.value = ''
-  transactionReceipt.value = null
-  
-  // 取消訂閱
-  vaultStore.$reset()
 }
+
+// 在組件卸載時確保清理訂閱
+onUnmounted(() => {
+  if (vaultStoreSubscription) {
+    try {
+      vaultStoreSubscription()
+      vaultStoreSubscription = null
+      console.log('[4626list] 組件卸載時已取消 vaultStore 訂閱')
+    } catch (error) {
+      console.error('[4626list] 組件卸載時取消訂閱發生錯誤:', error)
+    }
+  }
+})
 
 async function handleRetry() {
   transactionStatus.value = 'pending'
@@ -486,6 +573,23 @@ async function handleRetry() {
     transactionStatus.value = 'error'
     errorMessage.value = error.message || '重试失败'
   }
+}
+
+// 格式化金額顯示
+function formatDisplayAmount(amount, decimals = 6) {
+  if (!amount) return '0';
+  
+  // 確保金額是字符串
+  const amountStr = amount.toString();
+  
+  // 轉換為數字
+  const value = parseFloat(amountStr) / Math.pow(10, decimals);
+  
+  // 格式化顯示，保留2位小數
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
 }
 
 // 組件掛載時，如果錢包已連接則獲取代幣列表

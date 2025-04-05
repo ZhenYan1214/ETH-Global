@@ -132,6 +132,8 @@ export const useVaultStore = defineStore('vault', {
       const walletStore = useWalletStore()
       
       try {
+        console.log('[vault] 開始執行存款, tokens:', tokens)
+        
         if (!walletStore.isConnected) {
           throw new Error('請先連接錢包')
         }
@@ -141,45 +143,53 @@ export const useVaultStore = defineStore('vault', {
         }
         
         this.depositStatus = 'processing'
-        console.log('正在處理存款交易，tokens:', tokens)
+        console.log('[vault] 狀態設置為processing')
         
         // 通過 Wallet 發送存款交易
         const result = await walletStore.sendDepositTransaction(tokens)
-        console.log('存款交易結果:', result)
+        console.log('[vault] 存款交易結果:', result)
         
         // 設置交易哈希
         if (result && result.transactionHash) {
           this.transactionHash = result.transactionHash
-          console.log('交易已提交，交易哈希:', this.transactionHash)
+          console.log('[vault] 交易已提交，交易哈希:', this.transactionHash)
           
           // 等待交易確認並獲取收據
           try {
-            console.log('等待交易確認...')
+            console.log('[vault] 等待交易確認...')
             const receipt = await walletStore.provider.waitForTransaction(this.transactionHash)
-            console.log('交易已確認，receipt:', receipt)
-            this.depositReceipt = receipt
+            console.log('[vault] 交易已確認，receipt:', receipt)
+            
+            // 把收據轉換成純JavaScript對象，避免響應式問題
+            const receiptObj = JSON.parse(JSON.stringify(receipt))
+            
+            // 賦值給 depositReceipt
+            this.depositReceipt = receiptObj
+            console.log('[vault] 已設置 depositReceipt:', !!this.depositReceipt)
             
             // 檢查交易是否成功
             if (receipt && receipt.status === 1) {
               this.depositStatus = 'success'
+              console.log('[vault] 存款交易成功，狀態設置為success')
               mainStore.showNotification('存款交易成功！', 'success')
             } else {
               throw new Error('交易執行失敗')
             }
           } catch (confirmError) {
-            console.error('交易確認錯誤:', confirmError)
+            console.error('[vault] 交易確認錯誤:', confirmError)
             throw new Error(`交易確認失敗: ${confirmError.message}`)
           }
         } else {
           throw new Error('未能獲取交易哈希')
         }
         
+        console.log('[vault] 返回交易結果')
         return {
           transactionHash: this.transactionHash,
           receipt: this.depositReceipt
         }
       } catch (error) {
-        console.error('存款執行錯誤:', error)
+        console.error('[vault] 存款執行錯誤:', error)
         this.error = error.message || '存款交易失敗'
         this.depositStatus = 'error'
         mainStore.showNotification(`存款失敗: ${this.error}`, 'error')

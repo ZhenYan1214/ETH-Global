@@ -446,11 +446,16 @@ async function handleConfirmDeposit() {
     // 關閉當前對話框
     dialogModel.value = false;
     
-    // 向父組件發送顯示交易狀態的事件
-    emit('showTransactionStatus');
-    
     // 等待對話框關閉的過渡動畫
     await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // 向父組件發送顯示交易狀態的事件
+    try {
+      console.log('[Allowance] 發出顯示交易狀態事件');
+      emit('showTransactionStatus');
+    } catch (emitError) {
+      console.error('[Allowance] 發出交易狀態事件時發生錯誤:', emitError);
+    }
     
     if (!vaultStore.depositPreview) {
       throw new Error('沒有存款預覽數據');
@@ -476,10 +481,15 @@ async function handleConfirmDeposit() {
     }
     
     // 調用存款執行方法
-    console.log('執行存款操作，tokens:', tokens);
-    await vaultStore.executeDeposit(tokens);
+    console.log('[Allowance] 執行存款操作，tokens:', tokens);
+    try {
+      await vaultStore.executeDeposit(tokens);
+    } catch (depositError) {
+      console.error('[Allowance] 執行存款時發生錯誤:', depositError);
+      // 即使執行失敗，TransactionStatus 組件仍然會通過訂閱獲取並顯示錯誤狀態
+    }
   } catch (error) {
-    console.error('確認存款時發生錯誤:', error);
+    console.error('[Allowance] 確認存款時發生錯誤:', error);
     mainStore.showNotification('存款確認失敗: ' + (error.message || '未知錯誤'), 'error');
   }
 }

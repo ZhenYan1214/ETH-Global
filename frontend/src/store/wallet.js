@@ -718,17 +718,10 @@ export const useWalletStore = defineStore('wallet', {
     },
 
     // 原始方法保留，以保持向後兼容性
-    async sendDepositTransaction() {
-      // 首先準備交易數據
-      const prepareResult = await this.prepareDepositTransaction();
-      if (!prepareResult.success) {
-        return prepareResult;
-      }
-      
-      // 然後執行交易
-      return await this.executeDepositTransaction();
-    },
+   
+    async sendReddem(){
 
+    },
     // 格式化代幣金額的輔助函數
     formatTokenAmount(amount, decimals = 18) {
       const amountStr = typeof amount === 'bigint' ? amount.toString() : amount
