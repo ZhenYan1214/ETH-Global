@@ -7,10 +7,6 @@ export function formatAddress(address) {
 
 export function formatBalance(balance, decimals = 18) {
   if (!balance) return '0.00'
-  console.log("balance", balance)
-  console.log("decimals", decimals)
-  const balanceValue = ethers.formatUnits(balance, decimals)
-  console.log("balanceValue", balanceValue)
   return ethers.formatUnits(balance, decimals)
 }
 
