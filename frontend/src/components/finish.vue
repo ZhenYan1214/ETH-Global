@@ -96,7 +96,7 @@ onUnmounted(() => {
   if (ws) ws.close()
 })
 function connectWebSocket() {
-  ws = new WebSocket("ws://localhost:3011")
+  ws = new WebSocket("ws://localhost:3012")
   ws.onopen = () => console.log("WebSocket connected")
   ws.onmessage = (event) => {
     try {
