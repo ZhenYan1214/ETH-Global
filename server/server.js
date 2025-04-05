@@ -48,7 +48,6 @@ app.get("/", (req, res) => {
 // 註冊路由
 app.use('/api/tokens', tokensRouter);
 app.use('/api/convert', convertRouter);
-app.use('/api/history', historyRouter);
 app.use('/api/webhook', webhookRouter);
 
 // 錯誤處理中間件
