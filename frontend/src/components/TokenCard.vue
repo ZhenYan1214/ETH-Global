@@ -18,7 +18,7 @@
       <div class="token-amount">
         <div class="amount-field-container">
           <v-text-field
-            v-model="localAmount"
+            v-model="localDisplayAmount"
             variant="outlined"
             density="compact"
             hide-details
@@ -65,55 +65,102 @@
 import { ref, computed, watch } from 'vue';
 import { useTokenStore } from '../store/tokens';
 
+/**
+ * props.token => {
+ *   address: string,
+ *   balance: string (wei),
+ *   price: string or number (1 token => x USD),
+ *   amount: string (wei) -> parent's selected amount in wei
+ *   ...
+ * }
+ */
 const props = defineProps({
   token: Object,
 });
 
+/**
+ * emits:
+ * - max: user clicked "MAX"
+ * - remove: user clicked remove icon
+ * - amount-change: return new amount in wei
+ */
 const emit = defineEmits(['max', 'remove', 'amount-change']);
 
 const tokenStore = useTokenStore();
-const localAmount = ref(props.token?.amount || '');
 
-watch(() => props.token?.amount, (newAmount) => {
-  if (newAmount !== localAmount.value) {
-    localAmount.value = newAmount;
+/**
+ * localDisplayAmount: 用來顯示在輸入框的「普通小數數量」(非 wei)
+ * 
+ * props.token.amount: 來自父層的wei值
+ */
+const localDisplayAmount = ref('');
+
+/**
+ * 當父層 token.amount(wei) 改變時，把它轉成普通小數顯示
+ */
+watch(() => props.token?.amount, (newWei) => {
+  if (!newWei) {
+    localDisplayAmount.value = '';
+    return;
   }
-});
+  const tokenInfo = tokenStore.allTokens[props.token.address?.toLowerCase()] || {};
+  const decimals = tokenInfo.decimals ?? 18;
 
-function handleAmountChange(event) {
-  emit('amount-change', event.target.value);
+  const realAmount = parseFloat(newWei) / 10 ** decimals;
+  // 顯示時保留幾位小數隨你
+  localDisplayAmount.value = realAmount.toString();
+}, { immediate: true });
+
+/**
+ * 當輸入框改變時，將普通小數數量轉成 wei emit出去
+ */
+function handleAmountChange(e) {
+  const inputValue = parseFloat(e.target.value || '0');
+  localDisplayAmount.value = e.target.value; // keep raw string
+
+  const tokenInfo = tokenStore.allTokens[props.token?.address?.toLowerCase()] || {};
+  const decimals = tokenInfo.decimals ?? 18;
+
+  // 轉回wei (大整數)
+  const newWei = (inputValue * 10 ** decimals).toFixed(0);
+
+  emit('amount-change', newWei);
 }
 
+/**
+ * 依賴 tokenStore 來取得 token logo
+ */
 function getTokenLogo(address) {
   if (!address) return 'https://via.placeholder.com/40';
   
   const userToken = tokenStore.tokens.find(t => t.address.toLowerCase() === address.toLowerCase());
-  if (userToken && userToken.logoURI) return userToken.logoURI;
+  if (userToken?.logoURI) return userToken.logoURI;
   
   const tokenInfo = tokenStore.allTokens[address.toLowerCase()];
-  return tokenInfo && tokenInfo.logoURI ? tokenInfo.logoURI : 'https://via.placeholder.com/40';
+  return tokenInfo?.logoURI || 'https://via.placeholder.com/40';
 }
 
 function getTokenSymbol(address) {
   if (!address) return '???';
   
-  const userToken = tokenStore.tokens.find(t => t.address.toLowerCase() === address.toLowerCase());
-  if (userToken && userToken.symbol) return userToken.symbol;
+  const userToken = tokenStore.tokens.find(t => t.address?.toLowerCase() === address.toLowerCase());
+  if (userToken?.symbol) return userToken.symbol;
   
   const tokenInfo = tokenStore.allTokens[address.toLowerCase()];
-  return tokenInfo ? tokenInfo.symbol : '???';
+  return tokenInfo?.symbol || '???';
 }
 
+/**
+ * 顯示餘額(wei->普通數量)
+ */
 function getFormattedBalance(token) {
-  if (!token) return '0';
+  if (!token?.address) return '0';
   
   const tokenInfo = tokenStore.allTokens[token.address.toLowerCase()];
   const decimals = tokenInfo?.decimals || 18;
   
-  if (token.formattedBalance) return token.formattedBalance;
-  
   try {
-    const normalizedBalance = parseFloat(token.balance || '0') / Math.pow(10, decimals);
+    const normalizedBalance = parseFloat(token.balance || '0') / 10 ** decimals;
     return normalizedBalance.toLocaleString('en-US', {
       maximumFractionDigits: 6,
       minimumFractionDigits: 0
@@ -123,11 +170,11 @@ function getFormattedBalance(token) {
   }
 }
 
+/**
+ * 顯示單位價格
+ */
 function getFormattedPrice(token) {
-  if (!token || !token.price) return '$0.00';
-  
-  if (token.formattedPrice) return token.formattedPrice;
-  
+  if (!token?.price) return '$0.00';
   try {
     const priceNum = parseFloat(token.price);
     return '$' + priceNum.toLocaleString('en-US', {
@@ -139,20 +186,21 @@ function getFormattedPrice(token) {
   }
 }
 
+/**
+ * 計算顯示USD:
+ * localDisplayAmount(普通數量) * token.price
+ * 最多小數點三位
+ */
 const calculateValueUSD = computed(() => {
-  if (!props.token || !props.token.price || !localAmount.value) return '$0.00';
-  
-  const tokenInfo = tokenStore.allTokens[props.token.address.toLowerCase()];
-  const decimals = tokenInfo?.decimals || 18;
-  
+  if (!props.token?.price || !localDisplayAmount.value) return '$0.00';
+
   try {
-    // Calculate normalized amount
-    const amount = parseFloat(localAmount.value || '0');
-    const value = amount * parseFloat(props.token.price);
-    
-    return '$' + value.toLocaleString('en-US', {
+    const inputValue = parseFloat(localDisplayAmount.value || '0');
+    const priceNum = parseFloat(props.token.price);
+    const totalUSD = inputValue * priceNum;
+    return '$' + totalUSD.toLocaleString('en-US', {
       minimumFractionDigits: 2,
-      maximumFractionDigits: 2
+      maximumFractionDigits: 3
     });
   } catch (e) {
     return '$0.00';
@@ -265,4 +313,4 @@ function handleImageError(event) {
     gap: 16px;
   }
 }
-</style> 
+</style>
