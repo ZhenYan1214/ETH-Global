@@ -14,6 +14,8 @@ export const useTokenStore = defineStore('tokens', {
     selectedFromToken: null,
     selectedFromTokens: [],
     selectedToToken: null,
+    toTokenFee:null,
+    predictToAmount: null,
     fromAmount: '',
     toAmount: '',
     exchangeRate: null,
@@ -875,6 +877,8 @@ export const useTokenStore = defineStore('tokens', {
       this.toAmount = '';
       this.exchangeRate = null;
     },
+
+
 
     // Batch fetch multiple token prices
     async batchFetchTokenPrices(addresses, chainId = 137) {

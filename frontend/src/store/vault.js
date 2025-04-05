@@ -1,8 +1,10 @@
 import { defineStore } from 'pinia'
 import { useWalletStore } from './wallet'
-
+import { piggyVaultAbi } from '../assets/abi'
 export const useVaultStore = defineStore('vault', {
   state: () => ({
+    valutAddress: "0xa72cFe5dCa3f2bEB1fD8a90C02e224897a821552",
+    abi: piggyVaultAbi,
     assets: [],
     transactions: [],
     isLoading: false,
