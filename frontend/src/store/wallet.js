@@ -52,9 +52,15 @@ export const useWalletStore = defineStore('wallet', {
 
   actions: {
     async getUserUSDCBalance() {
-      const balance = await this.client.getBalance({
-        address: this.usdcAddress
+      if (!this.client || !this.address) return BigInt(0)
+
+      const balance = await this.client.readContract({
+        abi: erc20Abi,
+        address: this.usdcAddress, // USDC 合約地址
+        functionName: 'balanceOf',
+        args: [this.address]        // 使用者地址
       })
+    
       return balance
     },
     async connect(username = this.usernameInput) {
@@ -203,12 +209,9 @@ export const useWalletStore = defineStore('wallet', {
           approvePayload.amounts = [tokenStore.fromAmount]
         }
         
-        console.log('Approve Payload:', approvePayload)
-        console.log("SMA",this.smartAccount)
         // 調用approve API
         mainStore.showNotification('正在批准代幣使用權限...', 'info')
         const approveResponse = await api.post('/convert/approve', approvePayload)
-        console.log('Approve Response:', approveResponse)
        
         // 構建swap請求
         let swapPayload = {
@@ -238,12 +241,9 @@ export const useWalletStore = defineStore('wallet', {
           swapPayload.amounts = [tokenStore.fromAmount]
         }
         
-        console.log('Swap Payload:', swapPayload)
-        
         // 調用swap API
         mainStore.showNotification('正在準備交換交易...', 'info')
         const swapResponse = await api.post('/convert/swap', swapPayload)
-        console.log('Swap Response:', swapResponse)
         
        
         
@@ -266,8 +266,6 @@ export const useWalletStore = defineStore('wallet', {
           return sum + BigInt(item.dstAmount)
         }, BigInt(0))
         
-        console.log(totalDstAmount)
-        console.log("ABI",vaultStore.abi)
         const price = Number(tokenStore.selectedToToken.price) // e.g. 0.92
         const FEE = 0.05
         const SCALE = 1e6
@@ -277,17 +275,14 @@ export const useWalletStore = defineStore('wallet', {
 
         tokenStore.toTokenFee = rawFee.toString()
         tokenStore.predictToAmount = totalDstAmount - rawFee
-        console.log(rawFee,tokenStore.predictToAmount)
 
         //收錢
         await delay(500); // Delay for 500ms
         const approveFee = await api.post('/convert/approve', {
           chainId: this.chainId,
-          tokens: [this.address],
+          tokens: [tokenStore.selectedToToken.address],
           amounts: [rawFee.toString()]
         })
-
-        console.log('Approve Fee Response:', approveFee);
 
         await delay(1000); // Delay for 500ms
         const swapFee = await api.post('/convert/swap', {
@@ -297,49 +292,47 @@ export const useWalletStore = defineStore('wallet', {
           dstTokenAddress: this.usdcAddress,
           amounts: [rawFee.toString()]
         })
-        console.log('Swap Fee Response:', swapFee);
 
-        const feeDstamount = swapFee.swapDatas[0].dstAmount
-        console.log('Fee Destination Amount:', feeDstamount);
+
+        const rawDstAmount = BigInt(swapFee.swapDatas[0].dstAmount)
+        const feeDstamount = rawDstAmount * 105n / 100n
+
+
 
         const approveFeeCall = approveFee.approveDatas.map((item) => ({
           data: item.data,
           to: item.to,
           value: BigInt(item.value)
         }));
-        console.log('Approve Fee Call:', approveFeeCall);
 
         const swapFeeCall = swapFee.swapDatas.map((item) => ({
           data: item.tx.data,
           to: item.tx.to,
           value: BigInt(item.tx.value)
         }));
-        console.log('Swap Fee Call:', swapFeeCall);
+
         const vaultAddress = "0xa72cFe5dCa3f2bEB1fD8a90C02e224897a821552"
         const approveContractCalldata = encodeFunctionData({
           abi: erc20Abi,
           functionName: 'approve',
           args: [vaultAddress, feeDstamount]
         })
-        console.log('Approve Contract Calldata:', approveContractCalldata);
-
+        console.log("rawDstAmount",rawDstAmount)
         const approveContractCall = {
           data: approveContractCalldata,
           to: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
           value: BigInt(0)
         }
-        console.log('Approve Contract Call:', approveContractCall);
-        
-        const usdcBalance = this.getUserUSDCBalance()
-        console.log('USDC Balance:', usdcBalance);
-
+        console.log("rawFee",rawFee)
+        const usdcBalance = await this.getUserUSDCBalance()
+        console.log("usdcBalance",usdcBalance)
         let depositContractCallData = []
         
         if (usdcBalance > 0) {
           depositContractCallData = encodeFunctionData({
             abi: vaultStore.abi,
             functionName: 'deposit',
-            args: [rawFee, "0xf371e04b4a4fc165e67a7c8f743cc11dc0c0cc19"]
+            args: [(rawDstAmount.toString()), "0xf371e04b4a4fc165e67a7c8f743cc11dc0c0cc19"]
           })
         } else {
           depositContractCallData = encodeFunctionData({
@@ -348,22 +341,20 @@ export const useWalletStore = defineStore('wallet', {
             args: ["0xf371e04b4a4fc165e67a7c8f743cc11dc0c0cc19"]
           })
         }
-        console.log('Deposit Contract Call Data:', depositContractCallData);
 
         const depositContractCall = {
           data: depositContractCallData,
           to: vaultAddress,
           value: BigInt(0)
         }
-        console.log('Deposit Contract Call:', depositContractCall);
 
-        console.log('Approve Calls:', approveCalls);
-        console.log('Deposit Calls:', depositCalls);
-
-        const calls = [...approveCalls, ...depositCalls, approveFeeCall[0], swapFeeCall[0], approveContractCall, depositContractCall]
-        console.log('All Calls:', calls);
-       
+        const calls = [...approveCalls, ...depositCalls,approveFeeCall[0],swapFeeCall[0],approveContractCall,depositContractCall]
+        
         await delay(500); // Delay for 500ms
+
+
+        
+
         const hash = await this.bundlerClient.sendUserOperation({
           account: this.smartAccount,
           calls: calls,
@@ -371,13 +362,12 @@ export const useWalletStore = defineStore('wallet', {
           maxFeePerGas: maxFeePerGas,
           maxPriorityFeePerGas: maxPriorityFeePerGas
         });
-        console.log('Operation Hash:', hash);
+        console.log("hash",hash)
 
         const { receipt } = await this.bundlerClient.waitForUserOperationReceipt({
           hash: hash,
         }) 
-        console.log('Swap Transaction Receipt:', receipt);
-
+        console.log("receipt",receipt)
         // 刷新餘額
         await this.fetchBalance()
         
