@@ -1,5 +1,10 @@
 <template>
   <div class="website-container">
+    <!-- Background Image -->
+    <div class="background-image-container">
+      <img src="@/assets/wsBG.png" alt="Background" class="background-image" />
+    </div>
+
     <!-- Navigation Bar -->
     <nav class="nav-bar">
       <div class="logo" @click="scrollToTop">
@@ -7,19 +12,20 @@
         <span class="logo-text">Piggy Vault</span>
       </div>
       <div class="nav-links">
-        <a
-          v-for="(link, index) in navLinks"
-          :key="index"
-          :href="link.href"
-          class="nav-link"
-          :class="{ active: activeSection === link.href.slice(1) }"
-          @click.prevent="smoothScroll(link.href)"
-        >
-          {{ link.text }}
-        </a>
-        <button class="connect-wallet-btn" @mouseenter="hoverWalletBtn" @mouseleave="leaveWalletBtn">
-          Connect Wallet
-        </button>
+        <div class="social-nav-links">
+          <a href="https://twitter.com" target="_blank" class="social-nav-link">
+            <i class="fa-brands fa-twitter"></i>
+          </a>
+          <a href="https://discord.com" target="_blank" class="social-nav-link">
+            <i class="fa-brands fa-discord"></i>
+          </a>
+          <a href="https://t.me" target="_blank" class="social-nav-link">
+            <i class="fa-brands fa-telegram"></i>
+          </a>
+          <a href="https://instagram.com" target="_blank" class="social-nav-link">
+            <i class="fa-brands fa-instagram"></i>
+          </a>
+        </div>
       </div>
     </nav>
 
@@ -48,14 +54,7 @@
             Learn More
           </v-btn>
 
-          <v-btn
-            to="/home"
-            size="x-large"
-            class="welcome-btn enter-btn"
-            elevation="4"
-          >
-            進入豬豬世界
-          </v-btn>
+          
         </div>
       </div>
       <div class="hero-image">
@@ -149,19 +148,42 @@
     </button>
 
     <!-- Feedback Modal -->
-    <div v-if="showFeedbackModal" class="feedback-modal" @click="closeModalOnOutsideClick">
+    <div v-if="showFeedbackModal" class="feedback-modal">
       <div class="feedback-content">
-        <h3>Help Us Improve Piggy Vault</h3>
-        <div class="feedback-options">
-          <button
-            v-for="(option, index) in feedbackOptions"
-            :key="index"
-            class="feedback-option"
-            @click="submitFeedback(option)"
-          >
-            {{ option }}
+        <div v-if="!showThankYou && !showCommentInput" class="modal-header">
+          <h3>Help Us Make Piggy Vault Better! 🐷</h3>
+          <p class="modal-description">Your feedback is important to us. Please share your thoughts!</p>
+        </div>
+
+        <div v-if="!showThankYou && !showCommentInput" class="feedback-options">
+          <button class="feedback-option" @click="submitFeedback('like')">
+            <span class="option-icon">👍</span>
+            <span class="option-text">I Like It</span>
+          </button>
+          <button class="feedback-option" @click="submitFeedback('dislike')">
+            <span class="option-icon">👎</span>
+            <span class="option-text">I Don't Like It</span>
+          </button>
+          <button class="feedback-option" @click="showCommentForm">
+            <span class="option-icon">💭</span>
+            <span class="option-text">I Want to Say Something</span>
           </button>
         </div>
+
+        <div v-if="showCommentInput" class="comment-section">
+          <textarea
+            v-model="feedbackText"
+            class="feedback-textarea"
+            placeholder="Tell us what you think..."
+          ></textarea>
+          <button class="submit-btn" @click="submitComment">Submit</button>
+        </div>
+
+        <div v-if="showThankYou" class="thank-you-message">
+          <div class="thank-you-icon">{{ thankYouIcon }}</div>
+          <p>{{ thankYouText }}</p>
+        </div>
+
         <button class="close-modal" @click="closeFeedbackModal">&times;</button>
       </div>
     </div>
@@ -216,11 +238,11 @@ const steps = ref([
 
 // Feedback modal data
 const showFeedbackModal = ref(false);
-const feedbackOptions = ref([
-  'I Like Something',
-  'I Don\'t Like Something',
-  'I Have an Idea',
-]);
+const showThankYou = ref(false);
+const showCommentInput = ref(false);
+const feedbackText = ref('');
+const thankYouIcon = ref('');
+const thankYouText = ref('');
 
 // Social icons data
 const socialIcons = ref([
@@ -268,7 +290,7 @@ const updateActiveSection = () => {
 // Connect Wallet button hover animation
 const walletBtn = ref(null);
 const hoverWalletBtn = (event) => {
-  event.target.style.transform = 'scale(1.05)';
+  event.target.style.transform = 'scale(1.02)';
   event.target.style.boxShadow = '0 0 8px rgba(255, 111, 145, 0.2)';
 };
 const leaveWalletBtn = (event) => {
@@ -291,18 +313,46 @@ const observer = new IntersectionObserver((entries) => {
 // Feedback modal functions
 const openFeedbackModal = () => {
   showFeedbackModal.value = true;
+  showThankYou.value = false;
+  showCommentInput.value = false;
+  feedbackText.value = '';
 };
 const closeFeedbackModal = () => {
   showFeedbackModal.value = false;
+  showThankYou.value = false;
+  showCommentInput.value = false;
+  feedbackText.value = '';
 };
-const closeModalOnOutsideClick = (e) => {
-  if (e.target.classList.contains('feedback-modal')) {
-    closeFeedbackModal();
+const showCommentForm = () => {
+  showCommentInput.value = true;
+};
+const submitFeedback = (type) => {
+  if (type === 'like') {
+    thankYouIcon.value = '🥰';
+    thankYouText.value = 'Your like is our motivation, thank you!';
+  } else if (type === 'dislike') {
+    thankYouIcon.value = '🙏';
+    thankYouText.value = 'Thank you for your valuable feedback!';
   }
+  showThankYou.value = true;
+  
+  // 這裡可以加入發送反饋到後端的邏輯
+  setTimeout(() => {
+    closeFeedbackModal();
+  }, 1000);
 };
-const submitFeedback = (option) => {
-  console.log('Feedback option clicked:', option);
-  closeFeedbackModal();
+const submitComment = () => {
+  if (feedbackText.value.trim()) {
+    thankYouIcon.value = '🙏';
+    thankYouText.value = 'Thank you for your valuable feedback!';
+    showThankYou.value = true;
+    showCommentInput.value = false;
+    
+    // 這裡可以加入發送反饋到後端的邏輯
+    setTimeout(() => {
+      closeFeedbackModal();
+    }, 1000);
+  }
 };
 
 // Scroll to specific sections
@@ -349,7 +399,7 @@ const connectWallet = async () => {
 // Lifecycle hooks
 onMounted(() => {
   // Initialize Intersection Observer for fade-in animations
-  document.querySelectorAll('section, .step').forEach((element) => {
+  document.querySelectorAll('section, .step, .bottom-bg-image').forEach((element) => {
     element.style.opacity = '0';
     element.style.transform = 'translateY(20px)';
     element.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
@@ -370,34 +420,42 @@ onUnmounted(() => {
 
 <style scoped>
 /* Reset and Base Styles */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
-body {
-  font-family: 'Poppins', sans-serif;
-  background: linear-gradient(180deg, #E6F0FA 0%, #FFDDE5 100%);
-  min-height: 100vh;
+.website-container {
   position: relative;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background: linear-gradient(180deg, #E6F0FA 0%, #FFDDE5 100%);
 }
 
-/* Background Pattern */
-.website-container::before {
-  content: '';
+.background-image-container {
   position: fixed;
-  top: 0;
-  left: 0;
+  top: calc(50% - 50px);
+  left: calc(50% + 330px);
+  transform: translate(-50%, -50%);
+  width: 480px;
+  height: auto;
+  z-index: 0;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.background-image {
   width: 100%;
-  height: 100%;
-  background-image: 
-    linear-gradient(45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%),
-    linear-gradient(-45deg, rgba(255, 255, 255, 0.1) 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.1) 75%),
-    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.1) 75%);
-  background-size: 20px 20px;
-  z-index: -1;
+  height: auto;
+  object-fit: contain;
+  opacity: 0.3;
+}
+
+/* 確保其他內容在背景之上 */
+.nav-bar,
+.hero-section,
+.how-it-works,
+.feedback-modal,
+.scroll-to-top {
+  position: relative;
+  z-index: 1;
 }
 
 /* Navigation Bar */
@@ -512,6 +570,7 @@ body {
   justify-content: space-between;
   align-items: center;
   gap: 60px;
+  overflow: visible;
 }
 
 .hero-content {
@@ -560,19 +619,20 @@ body {
 }
 
 .welcome-btn {
-  font-size: 1.5rem !important;
-  padding: 1rem 3rem !important;
-  letter-spacing: 1px !important;
-  text-transform: none !important;
-  transition: all 0.3s ease !important;
-  color: white !important;
-  border: none !important;
-  border-radius: 50px !important;
-  min-width: 250px !important;
+  font-size: 1.5rem ;
+  padding: 1.5rem 3rem ;
+  letter-spacing: 1px ;
+  text-transform: none ;
+  transition: all 0.3s ease ;
+  color: white ;
+  border: none ;
+  border-radius: 50px ;
+  min-width: 250px ;
+  height: 70px !important; 
 }
 
 .get-started-btn {
-  background: linear-gradient(45deg, #FF9999, #FFB6C1) !important;
+  background: linear-gradient(90deg, #FF6F91, #FF8DA1) !important;
 }
 
 .enter-btn {
@@ -587,6 +647,11 @@ body {
 .hero-image {
   flex: 1;
   position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  overflow: visible;
 }
 
 .piggy-container {
@@ -594,6 +659,9 @@ body {
   width: 400px;
   height: 400px;
   margin: 0 auto;
+  transform-origin: center;
+  transform: scale(1.5);
+  margin-right: -20px
 }
 
 .piggy-mascot {
@@ -735,60 +803,104 @@ body {
 }
 
 .feedback-content {
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(10px);
-  padding: 40px;
-  border-radius: 24px;
-  width: 480px;
+  background: white;
+  padding: 32px;
+  border-radius: 20px;
+  width: 90%;
+  max-width: 400px;
   position: relative;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
 }
 
-.feedback-content h3 {
+.modal-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.modal-header h3 {
   font-size: 24px;
   color: #2D2D2D;
-  margin-bottom: 24px;
-  text-align: center;
+  margin-bottom: 8px;
+}
+
+.modal-header .modal-description {
+  color: #666;
+  font-size: 16px;
 }
 
 .feedback-options {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .feedback-option {
-  width: 100%;
-  height: 56px;
-  background: #F5F7FA;
-  border: none;
+  display: flex;
+  align-items: center;
+  padding: 16px;
+  background: #F8F9FA;
+  border: 1px solid #E9ECEF;
   border-radius: 12px;
-  font-size: 18px;
-  font-weight: 500;
-  color: #2D2D2D;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
 }
 
 .feedback-option:hover {
-  background: #FFDDE5;
-  color: #FF6F91;
+  background: #FFF5F7;
+  border-color: #FF6F91;
+  transform: translateY(-2px);
+}
+
+.option-icon {
+  font-size: 24px;
+  margin-right: 12px;
+}
+
+.option-text {
+  font-size: 16px;
+  color: #2D2D2D;
 }
 
 .close-modal {
   position: absolute;
-  top: 16px;
-  right: 16px;
-  background: none;
+  top: 12px;
+  right: 12px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
   border: none;
-  font-size: 24px;
-  color: #4A4A4A;
+  background: #F8F9FA;
+  color: #666;
+  font-size: 20px;
   cursor: pointer;
-  transition: color 0.3s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .close-modal:hover {
+  background: #FFF5F7;
   color: #FF6F91;
+}
+
+@media (max-width: 480px) {
+  .feedback-content {
+    width: 95%;
+    padding: 24px;
+    margin: 10px;
+  }
+
+  .modal-header h3 {
+    font-size: 20px;
+  }
+
+  .modal-header .modal-description {
+    font-size: 14px;
+  }
+
+  .feedback-option {
+    padding: 12px;
+  }
 }
 
 /* Footer */
@@ -981,6 +1093,10 @@ body {
     flex-direction: column;
     gap: 40px;
   }
+
+  .background-image-container {
+    width: 120px;
+  }
 }
 
 @media (max-width: 768px) {
@@ -1012,6 +1128,10 @@ body {
 
   .feedback-btn {
     bottom: 80px;
+  }
+
+  .background-image-container {
+    width: 100px;
   }
 }
 
@@ -1045,5 +1165,97 @@ html {
 
 .floating-coins .coin-icon:nth-child(3) {
   animation-delay: 1s;
+}
+
+.comment-section {
+  margin-top: 20px;
+}
+
+.feedback-textarea {
+  width: 100%;
+  height: 120px;
+  padding: 12px;
+  border: 1px solid #E9ECEF;
+  border-radius: 12px;
+  resize: none;
+  font-size: 16px;
+  margin-bottom: 16px;
+  transition: border-color 0.3s ease;
+}
+
+.feedback-textarea:focus {
+  outline: none;
+  border-color: #FF6F91;
+}
+
+.submit-btn {
+  width: 100%;
+  padding: 12px;
+  background: #FF6F91;
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.submit-btn:hover {
+  background: #FF8DA1;
+  transform: translateY(-2px);
+}
+
+.thank-you-message {
+  text-align: center;
+  padding: 20px;
+}
+
+.thank-you-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.thank-you-message p {
+  font-size: 18px;
+  color: #2D2D2D;
+  line-height: 1.5;
+}
+
+.social-nav-links {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.social-nav-link {
+  color: #666;
+  font-size: 24px;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.social-nav-link:hover {
+  color: #FF6F91;
+  transform: translateY(-2px);
+  background: rgba(255, 111, 145, 0.1);
+}
+
+@media (max-width: 768px) {
+  .social-nav-links {
+    gap: 12px;
+  }
+
+  .social-nav-link {
+    font-size: 20px;
+    width: 36px;
+    height: 36px;
+  }
 }
 </style> 
