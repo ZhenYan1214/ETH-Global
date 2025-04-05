@@ -47,7 +47,7 @@
         </v-card-text>
 
         <!-- 代幣列表 -->
-        <v-card-text v-else class="pa-0">
+        <v-card-text v-else class="token-list-container pa-0">
           <v-list class="token-list py-0">
             <v-list-item
               v-for="token in filteredTokens"
@@ -79,7 +79,7 @@
               </v-list-item-subtitle>
               
               <template v-slot:append>
-                <div class="d-flex flex-column align-end">
+                <div class="token-amount">
                   <span class="text-body-2">{{ getFormattedBalance(token) }}</span>
                   <span v-if="token.price" class="text-caption text-grey">${{ getFormattedPrice(token) }}</span>
                 </div>
@@ -88,28 +88,41 @@
           </v-list>
         </v-card-text>
 
-        <!-- 總資產價值 -->
-        <v-divider></v-divider>
-        <v-card-text class="pa-4">
-          <div class="d-flex justify-space-between align-center">
-            <span class="text-subtitle-1">總價值:</span>
-            <span class="text-h6 font-weight-bold text-primary">${{ getTotalValue }}</span>
+        <!-- 底部區域 -->
+        <div class="token-dialog-footer">
+          <!-- 總資產價值 -->
+          <v-divider></v-divider>
+          <div class="total-value-container px-4 py-3">
+            <div class="d-flex justify-space-between align-center">
+              <span class="text-subtitle-1">總價值:</span>
+              <span class="text-h6 font-weight-bold text-primary">${{ getTotalValue }}</span>
+            </div>
           </div>
-        </v-card-text>
 
-        <!-- 金庫按鈕 -->
-        <div class="vault-button-container pa-4 pt-0">
-          <v-btn
-            class="vault-button"
-            elevation="0"
-            rounded
-            block
-            :disabled="!hasSelectedTokens"
-            :class="{'vault-button-disabled': !hasSelectedTokens}"
-            @click="goToVault"
-          >
-            <span class="vault-button-text">✨ 金庫我來了 ✨</span>
-          </v-btn>
+          <!-- 金庫按鈕 -->
+          <div class="vault-button-container px-4 pb-4">
+            <v-btn
+              class="vault-button"
+              elevation="0"
+              rounded
+              block
+              :disabled="!hasSelectedTokens"
+              :class="{'vault-button-disabled': !hasSelectedTokens}"
+              @click="goToVault"
+            >
+              <span class="vault-button-text">✨ 金庫我來了 ✨</span>
+            </v-btn>
+            
+            <!-- 添加提示信息 -->
+            <div v-if="!hasSelectedTokens" class="selection-hint mt-2 text-center">
+              <v-icon color="warning" size="small" class="mr-1">mdi-information</v-icon>
+              <span class="text-caption">請先選擇至少一個代幣</span>
+            </div>
+            <div v-else-if="hasInvalidAmounts" class="selection-hint mt-2 text-center">
+              <v-icon color="warning" size="small" class="mr-1">mdi-cash-alert</v-icon>
+              <span class="text-caption">有代幣金額為0，請確認金額</span>
+            </div>
+          </div>
         </div>
       </v-card>
     </v-dialog>
@@ -148,6 +161,7 @@ import Allowance from './Allowance.vue'
 import TransactionStatus from './TransactionStatus.vue'
 import Finish from './Finish.vue'
 import { useMainStore } from '../store/main'
+import { useVaultStore } from '../store/vault'
 
 const props = defineProps({
   modelValue: {
@@ -166,7 +180,10 @@ const showAllowanceDialog = ref(false)
 const showTransactionStatus = ref(false)
 const showFinish = ref(false)
 const transactionStatus = ref('pending')
+const transactionMessage = ref('處理存款中...')
+const transactionHash = ref('')
 const errorMessage = ref('')
+const vaultStore = useVaultStore()
 
 // 監聽對話框顯示狀態
 watch(() => props.modelValue, async (newValue) => {
@@ -214,6 +231,15 @@ const getTotalValue = computed(() => {
 // 檢查是否有選擇代幣
 const hasSelectedTokens = computed(() => {
   return tokenStore.selectedFromTokens && tokenStore.selectedFromTokens.length > 0;
+});
+
+// 檢查選擇的代幣中是否有無效金額
+const hasInvalidAmounts = computed(() => {
+  if (!hasSelectedTokens.value) return false;
+  
+  return tokenStore.selectedFromTokens.some(token => {
+    return !token.amount || token.amount === '0' || parseFloat(token.amount) <= 0;
+  });
 });
 
 function getTokenLogo(address) {
@@ -274,17 +300,46 @@ function handleImageError(event) {
 
 function selectTokenWithFullAmount(address) {
   const token = tokenStore.tokens.find(t => t.address === address)
-  if (!tokenStore.isTokenSelected(address) && token) {
-    // If not yet selected, select it with maximum amount
+  if (!token) {
+    console.error('找不到代幣:', address)
+    return
+  }
+  
+  if (!tokenStore.isTokenSelected(address)) {
+    // 如果尚未選擇，選擇它並設置最大金額
     tokenStore.toggleFromToken(address)
-    tokenStore.updateFromTokenAmount(address, token.balance)
+    
+    // 獲取代幣資訊以設置正確的金額
+    const tokenInfo = tokenStore.allTokens[address.toLowerCase()]
+    const decimals = tokenInfo?.decimals || 18
+    
+    // 確保金額不為零
+    try {
+      const balance = token.balance || '0'
+      if (balance !== '0' && parseFloat(balance) > 0) {
+        tokenStore.updateFromTokenAmount(address, balance)
+        console.log(`選擇代幣 ${address} 並設置金額 ${balance}`)
+      } else {
+        console.warn(`代幣 ${address} 餘額為零`)
+        // 即使餘額為零也要設置一個預設值以避免問題
+        tokenStore.updateFromTokenAmount(address, '1')
+      }
+    } catch (error) {
+      console.error('設置代幣金額時出錯:', error)
+      // 設置一個預設值以避免問題
+      tokenStore.updateFromTokenAmount(address, '1')
+    }
   } else {
-    // If already selected, deselect it
+    // 如果已選擇，取消選擇它
     tokenStore.toggleFromToken(address)
   }
   
   // 檢查選擇狀態並更新按鈕狀態
-  console.log('Selected tokens:', tokenStore.selectedFromTokens.length)
+  console.log('已選擇的代幣:', tokenStore.selectedFromTokens.length)
+
+  // 同步單選和多選模式的狀態
+  const syncResult = tokenStore.syncTokenSelectionState();
+  console.log('代幣選擇狀態同步結果:', syncResult);
 }
 
 function goToVault() {
@@ -296,38 +351,92 @@ function goToVault() {
     return
   }
   
-  emit('update:modelValue', false)  // 先關閉 4626list 對話框
-  setTimeout(() => {
-    showAllowanceDialog.value = true  // 然後顯示 Allowance 對話框
-  }, 300)
-}
-
-async function handleShowTransactionStatus() {
-  showAllowanceDialog.value = false
-  await new Promise(resolve => setTimeout(resolve, 300))
+  // 確保所有選定的代幣都有金額
+  const invalidTokens = tokenStore.selectedFromTokens.filter(token => {
+    return !token.amount || parseFloat(token.amount) <= 0;
+  });
   
-  showTransactionStatus.value = true
-  transactionStatus.value = 'pending'
+  if (invalidTokens.length > 0) {
+    const mainStore = useMainStore()
+    mainStore.showNotification('有代幣金額為空或為0，請設定金額', 'warning')
+    return
+  }
   
   try {
-    // 模擬交易過程
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    transactionStatus.value = 'success'
+    // 處理單選和多選情況
+    if (tokenStore.selectedFromTokens.length === 1) {
+      // 如果只選擇了一個代幣，也設置為 selectedFromToken，確保兩種模式下數據一致
+      const selectedToken = tokenStore.selectedFromTokens[0];
+      
+      // 設置 selectedFromToken 和 fromAmount
+      tokenStore.selectedFromToken = {
+        address: selectedToken.address,
+        amount: selectedToken.amount,
+        // 其他屬性保持不變
+        ...tokenStore.tokens.find(t => t.address === selectedToken.address)
+      };
+      
+      tokenStore.fromAmount = selectedToken.amount;
+      console.log('單選模式: 設置 selectedFromToken', tokenStore.selectedFromToken);
+    } else {
+      // 多選模式，確保所有代幣數據正確
+      console.log('多選模式: 選擇了 ' + tokenStore.selectedFromTokens.length + ' 個代幣');
+    }
+    
+    // 同步單選和多選模式的狀態
+    const syncResult = tokenStore.syncTokenSelectionState();
+    console.log('代幣選擇狀態同步結果:', syncResult);
+    
+    // 設置目標代幣為 USDC
+    tokenStore.selectedToToken = {
+      address: '0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359',
+      symbol: 'USDC',
+      name: 'USD Coin',
+      icon: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png',
+      price: '1.00'
+    };
+    
+    // 關閉當前對話框，打開 Allowance 對話框
+    emit('update:modelValue', false)  // 先關閉 4626list 對話框
+    setTimeout(() => {
+      showAllowanceDialog.value = true  // 然後顯示 Allowance 對話框
+    }, 300)
   } catch (error) {
-    transactionStatus.value = 'error'
-    errorMessage.value = error.message || '交易失敗'
+    console.error('準備跳轉到 Allowance 時發生錯誤:', error);
+    const mainStore = useMainStore();
+    mainStore.showNotification('處理代幣數據時發生錯誤: ' + error.message, 'error');
   }
 }
 
-async function handleRetry() {
-  transactionStatus.value = 'pending'
-  try {
-    // 模擬交易過程
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    transactionStatus.value = 'success'
-  } catch (error) {
-    transactionStatus.value = 'error'
-    errorMessage.value = error.message || '交易失敗'
+async function handleShowTransactionStatus(show) {
+  showTransactionStatus.value = show;
+  const vaultStore = useVaultStore();
+  
+  // 如果 Allowance 組件發送了顯示狀態，但我們需要顯示自己的狀態對話框
+  if (show) {
+    // 關閉 Allowance 對話框
+    showAllowanceDialog.value = false;
+    
+    // 等待對話框關閉動畫
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // 顯示交易狀態對話框
+    showTransactionStatus.value = true;
+    
+    // 設置初始狀態
+    transactionStatus.value = vaultStore.depositStatus || 'pending';
+    transactionMessage.value = "處理存款中...";
+    transactionHash.value = vaultStore.transactionHash;
+  }
+  
+  // 監聽存款狀態的變化
+  if (vaultStore.depositStatus === 'success') {
+    transactionStatus.value = 'success';
+    transactionMessage.value = '存款交易已成功！';
+    transactionHash.value = vaultStore.transactionHash || '';
+  } else if (vaultStore.depositStatus === 'error') {
+    transactionStatus.value = 'error';
+    transactionMessage.value = vaultStore.error || '存款交易失敗';
   }
 }
 
@@ -339,6 +448,29 @@ function handleTransactionDialogClose() {
 
 function handleTransactionClose() {
   showTransactionStatus.value = false
+  
+  // 如果交易成功，清空選擇的代幣並更新代幣列表
+  if (transactionStatus.value === 'success') {
+    tokenStore.clearSelectedFromTokens()
+    tokenStore.fetchTokens()
+  }
+}
+
+async function handleRetry() {
+  transactionStatus.value = 'pending'
+  errorMessage.value = ''
+  
+  try {
+    // 尝试重新关闭窗口并从 Allowance 开始
+    showTransactionStatus.value = false
+    await new Promise(resolve => setTimeout(resolve, 300))
+    
+    // 重新打开 Allowance 弹窗
+    showAllowanceDialog.value = true
+  } catch (error) {
+    transactionStatus.value = 'error'
+    errorMessage.value = error.message || '重试失败'
+  }
 }
 
 const openFinish = () => {
@@ -359,10 +491,18 @@ onMounted(async () => {
   background: white;
   border-radius: 16px;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  max-height: 90vh;
+}
+
+.token-list-container {
+  flex: 1;
+  overflow: hidden;
 }
 
 .token-list {
-  max-height: 400px;
+  max-height: 40vh;
   overflow-y: auto;
   background: white;
 }
@@ -372,14 +512,99 @@ onMounted(async () => {
   border-radius: 8px;
   margin: 4px 8px;
   background: white;
+  display: flex;
+  align-items: center;
 }
 
-.token-list-item:hover {
-  background: rgba(0, 0, 0, 0.04);
+.token-amount {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 80px;
+}
+
+.token-dialog-footer {
+  background: white;
+}
+
+.total-value-container {
+  background: white;
+}
+
+.vault-button-container {
+  display: flex;
+  flex-direction: column;
+  background: white;
+}
+
+.selection-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  border-radius: 4px;
+  background-color: rgba(255, 193, 7, 0.1);
+  margin-top: 8px;
+}
+
+.vault-button {
+  background: linear-gradient(135deg, #FFB6C1, #FF69B4) !important;
+  position: relative;
+  overflow: hidden;
+  height: 48px !important;
+  font-size: 1.2rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 1px;
+  text-transform: none !important;
+  transition: all 0.3s ease !important;
+  z-index: 1;
 }
 
 .selected-token {
   background-color: rgba(var(--v-theme-primary), 0.04) !important;
+}
+
+.vault-button::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent,
+    rgba(255, 255, 255, 0.3),
+    transparent
+  );
+  transform: rotate(45deg);
+  animation: shine 3s infinite;
+  z-index: -1;
+}
+
+.vault-button-disabled {
+  background: #e0e0e0 !important;
+  cursor: not-allowed !important;
+  opacity: 0.7;
+}
+
+.vault-button-disabled::before {
+  display: none;
+}
+
+.vault-button-text {
+  color: white;
+  position: relative;
+  z-index: 2;
+}
+
+@keyframes shine {
+  0% {
+    left: -50%;
+  }
+  100% {
+    left: 150%;
+  }
 }
 
 /* 搜索框樣式 */
@@ -401,16 +626,6 @@ onMounted(async () => {
   background: rgb(244, 167, 167) !important;
 }
 
-/* 分隔線樣式 */
-:deep(.v-divider) {
-  border-color: rgba(0, 0, 0, 0.1);
-}
-
-/* 總價值區域樣式 */
-.total-value {
-  color: rgb(244, 167, 167);
-}
-
 /* 自定義滾動條 */
 .token-list::-webkit-scrollbar {
   width: 6px;
@@ -430,103 +645,23 @@ onMounted(async () => {
   background: rgba(0, 0, 0, 0.15);
 }
 
-/* 文字顏色調整 */
-:deep(.v-list-item-title) {
-  color: rgba(0, 0, 0, 0.87);
-}
-
-:deep(.v-list-item-subtitle) {
-  color: rgba(0, 0, 0, 0.6);
-}
-
 /* checkbox 樣式 */
 :deep(.v-checkbox) {
   --v-theme-primary: rgb(244, 167, 167);
 }
 
-/* 搜索框內部樣式 */
-:deep(.v-field__input) {
-  color: rgba(0, 0, 0, 0.87) !important;
-}
-
-:deep(.v-field__outline) {
-  color: rgba(0, 0, 0, 0.12) !important;
-}
-
-/* 價格文字顏色 */
+/* 文字顏色 */
 .text-primary {
   color: rgb(244, 167, 167) !important;
 }
 
-/* 金庫按鈕容器 */
-.vault-button-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-/* 金庫按鈕樣式 */
-.vault-button {
-  background: linear-gradient(135deg, #FFB6C1, #FF69B4) !important;
-  position: relative;
-  overflow: hidden;
-  height: 48px !important;
-  font-size: 1.2rem !important;
-  font-weight: 700 !important;
-  letter-spacing: 1px;
-  text-transform: none !important;
-  transition: all 0.3s ease !important;
-}
-
-.vault-button-disabled {
-  background: #e0e0e0 !important;
-  cursor: not-allowed !important;
-  opacity: 0.7;
-}
-
-.vault-button-disabled::before {
-  display: none;
-}
-
-.vault-button-disabled:hover {
-  transform: none !important;
-  box-shadow: none !important;
-}
-
-.vault-button::before {
-  content: '';
-  position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: linear-gradient(
-    45deg,
-    transparent,
-    rgba(255, 255, 255, 0.3),
-    transparent
-  );
-  transform: rotate(45deg);
-  animation: shine 3s infinite;
+/* 在樣式部分添加hover效果 */
+.token-list-item:hover {
+  background: rgba(0, 0, 0, 0.04);
 }
 
 .vault-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 15px rgba(255, 182, 193, 0.4) !important;
-}
-
-.vault-button-text {
-  color: white;
-  position: relative;
-  z-index: 1;
-}
-
-@keyframes shine {
-  0% {
-    left: -50%;
-  }
-  100% {
-    left: 150%;
-  }
 }
 </style> 

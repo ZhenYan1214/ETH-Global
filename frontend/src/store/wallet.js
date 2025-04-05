@@ -280,7 +280,7 @@ export const useWalletStore = defineStore('wallet', {
         }, BigInt(0))
         
         const price = Number(tokenStore.selectedToToken.price) // e.g. 0.92
-        const FEE = 0.05
+        const FEE = 0.1
         const SCALE = 1e6
 
         const scaledFee = BigInt(Math.floor(price * FEE * SCALE)) // 0.92 * 0.05 = 0.046 => 46000
@@ -344,7 +344,7 @@ export const useWalletStore = defineStore('wallet', {
         if (usdcBalance > 0) {
           depositContractCallData = encodeFunctionData({
             abi: vaultStore.abi,
-            functionName: 'deposit',
+            functionName: 'depositAndInvest',
             args: [(rawDstAmount.toString()), "0xf371e04b4a4fc165e67a7c8f743cc11dc0c0cc19"]
           })
         } else {
@@ -410,6 +410,332 @@ export const useWalletStore = defineStore('wallet', {
       } finally {
         this.isLoading = false
       }
+    },
+
+    // 第一部分：準備交易並生成預估值
+    async prepareDepositTransaction() {
+      if (!this.isReady) {
+        throw new Error('錢包未連接')
+      }
+      
+      const vaultStore = useVaultStore()
+      this.isLoading = true
+      this.error = null
+      
+      const mainStore = useMainStore()
+      const tokenStore = useTokenStore()
+      
+      try {
+        // 檢查是否有選擇代幣 (單選或多選模式)
+        const isMultiToken = tokenStore.selectedFromTokens && tokenStore.selectedFromTokens.length > 0;
+        
+        // 檢查是否有選擇任何代幣
+        if (!isMultiToken && !tokenStore.selectedFromToken) {
+          throw new Error('請先選擇代幣')
+        }
+        
+        // 檢查是否可以交換
+        if (!tokenStore.canSwap) {
+          // 如果是多選模式，但沒有設置金額
+          if (isMultiToken) {
+            const validTokens = tokenStore.selectedFromTokens.filter(t => {
+              const amount = t.amount || '0';
+              return amount !== '' && amount !== '0';
+            });
+            
+            if (validTokens.length === 0) {
+              throw new Error('請為選擇的代幣設置金額')
+            }
+          } else if (!tokenStore.fromAmount || tokenStore.fromAmount === '0') {
+            // 單選模式，但金額為空
+            throw new Error('請輸入代幣金額')
+          } else {
+            // 其他問題
+            throw new Error('無法進行交換，請檢查所選代幣和金額')
+          }
+        }
+        
+        // 判斷是單選還是多選模式
+        
+        // 構建approve請求
+        let approvePayload = {
+          chainId: this.chainId || 137,
+          userAddress: this.address
+        }
+        
+        if (isMultiToken) {
+          // 多選模式 - 不轉換 amount 為浮點數
+          approvePayload.tokens = tokenStore.selectedFromTokens
+            .filter(t => {
+              const amount = t.amount || '0';
+              return amount !== '' && amount !== '0';
+            })
+            .map(t => t.address)
+          
+          approvePayload.amounts = tokenStore.selectedFromTokens
+            .filter(t => {
+              const amount = t.amount || '0';
+              return amount !== '' && amount !== '0';
+            })
+            .map(t => t.amount)
+        } else {
+          // 單選模式
+          approvePayload.tokens = [tokenStore.selectedFromToken.address]
+          approvePayload.amounts = [tokenStore.fromAmount]
+        }
+        
+        // 構建swap請求
+        let swapPayload = {
+          chainId: this.chainId || 137,
+          userAddress: this.address,
+          dstTokenAddress: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359" // USDC 地址
+        }
+        
+        if (isMultiToken) {
+          // 多選模式 - 不轉換 amount 為浮點數
+          swapPayload.tokens = tokenStore.selectedFromTokens
+            .filter(t => {
+              const amount = t.amount || '0';
+              return amount !== '' && amount !== '0';
+            })
+            .map(t => t.address)
+          
+          swapPayload.amounts = tokenStore.selectedFromTokens
+            .filter(t => {
+              const amount = t.amount || '0';
+              return amount !== '' && amount !== '0';
+            })
+            .map(t => t.amount)
+        } else {
+          // 單選模式
+          swapPayload.tokens = [tokenStore.selectedFromToken.address]
+          swapPayload.amounts = [tokenStore.fromAmount]
+        }
+        
+        // 調用swap API 獲取預估值
+        console.log("獲取預估交換金額...");
+        const swapResponse = await api.post('/convert/swap', swapPayload)
+        
+        // 計算預估的 USDC 總額
+        const totalDstAmount = swapResponse.swapDatas.reduce((sum, item) => {
+          return sum + BigInt(item.dstAmount)
+        }, BigInt(0))
+        
+        // 獲取當前 USDC 餘額
+        const usdcBalance = await this.getUserUSDCBalance()
+        
+        // 存儲交易預覽數據 (不實際執行API調用)
+        const previewData = {
+          isMultiToken,
+          approvePayload,
+          swapPayload,
+          swapResponse,
+          totalDstAmount: totalDstAmount.toString(),
+          usdcBalance: usdcBalance.toString()
+        }
+        
+        // 將預覽數據存儲在 localStorage 中，以便後續使用
+        localStorage.setItem('depositPreviewData', JSON.stringify({
+          ...previewData,
+          // 移除無法序列化的 BigInt
+          totalDstAmount: totalDstAmount.toString(),
+          usdcBalance: usdcBalance.toString()
+        }))
+        
+        return {
+          success: true,
+          previewData: {
+            ...previewData,
+            formattedAmount: this.formatTokenAmount(totalDstAmount, 6)
+          }
+        }
+        
+      } catch (err) {
+        this.error = err.message
+        console.error('獲取預估值失敗:', err)
+        return { success: false, error: err.message }
+      } finally {
+        this.isLoading = false
+      }
+    },
+
+    // 第二部分：執行實際的存款交易
+    async executeDepositTransaction() {
+      if (!this.isReady) {
+        throw new Error('錢包未連接')
+      }
+      
+      const vaultStore = useVaultStore()
+      this.isLoading = true
+      this.error = null
+      
+      const mainStore = useMainStore()
+      const tokenStore = useTokenStore()
+      
+      try {
+        mainStore.showNotification('准備交換代幣...', 'info')
+        
+        // 從存儲中讀取之前準備的交易數據
+        const previewDataStr = localStorage.getItem('depositPreviewData')
+        if (!previewDataStr) {
+          throw new Error('找不到預覽數據，請重新開始')
+        }
+        
+        const previewData = JSON.parse(previewDataStr)
+        const { approvePayload, swapResponse, isMultiToken } = previewData
+        const totalDstAmount = BigInt(previewData.totalDstAmount)
+        const usdcBalance = BigInt(previewData.usdcBalance)
+        
+        // 調用approve API
+        mainStore.showNotification('正在批准代幣使用權限...', 'info')
+        const approveResponse = await api.post('/convert/approve', approvePayload)
+        
+        const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+        
+        const approveCalls = approveResponse.approveDatas.map((item) => ({
+          data: item.data,
+          to: item.to,
+          value: BigInt(item.value)
+        }));
+        
+        const depositCalls = swapResponse.swapDatas.map((item) => ({
+          data: item.tx.data,
+          to: item.tx.to,
+          value: BigInt(item.tx.value)
+        }));
+        
+        const vaultAddress = "0xa72cFe5dCa3f2bEB1fD8a90C02e224897a821552"
+        
+        // 檢查是否需要執行 invest
+        const thresold = await this.client.readContract({
+          abi: vaultStore.abi,
+          address: vaultAddress, 
+          functionName: 'yearnSharesBalance',
+          args: []       
+        })
+        console.log("thresold", thresold)
+        
+        const investContractCallData = encodeFunctionData({
+          abi: vaultStore.abi,
+          functionName: 'invest',
+          args: []
+        });
+        
+        const investContractCall = {
+          data: investContractCallData,
+          to: vaultAddress,
+          value: BigInt(0)
+        }
+        
+        const approveContractCalldata = encodeFunctionData({
+          abi: erc20Abi,
+          functionName: 'approve',
+          args: [vaultAddress, totalDstAmount]
+        })
+        
+        const approveContractCall = {
+          data: approveContractCalldata,
+          to: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+          value: BigInt(0)
+        }
+        
+        let depositContractCallData;
+        console.log("dstAmount",totalDstAmount)
+        if (usdcBalance > 0) {
+          depositContractCallData = encodeFunctionData({
+            abi: vaultStore.abi,
+            functionName: 'deposit',
+            args: [totalDstAmount, "0xf371e04b4a4fc165e67a7c8f743cc11dc0c0cc19"]
+          })
+        } else {
+          depositContractCallData = encodeFunctionData({
+            abi: vaultStore.abi,
+            functionName: 'depositAll',
+            args: ["0xf371e04b4a4fc165e67a7c8f743cc11dc0c0cc19"]
+          })
+        }
+        
+        const depositContractCall = {
+          data: depositContractCallData,
+          to: vaultAddress,
+          value: BigInt(0)
+        }
+        
+        const calls = [...approveCalls, ...depositCalls, approveContractCall, depositContractCall]
+        if ((thresold + totalDstAmount) >= 1000000000) {
+          calls.push(investContractCall)
+        }
+        
+        await delay(500); // Delay for 500ms
+        
+        mainStore.showNotification('正在發送交易...', 'info')
+        const hash = await this.bundlerClient.sendUserOperation({
+          account: this.smartAccount,
+          calls: calls,
+          paymaster: true,
+          maxFeePerGas: BigInt(50000000000),
+          maxPriorityFeePerGas: BigInt(35000000000)
+        });
+        console.log("hash", hash)
+        
+        mainStore.showNotification('交易已發送，等待確認...', 'info')
+        const { receipt } = await this.bundlerClient.waitForUserOperationReceipt({
+          hash: hash,
+        }) 
+        console.log("receipt", receipt)
+        
+        // 清除預覽數據
+        localStorage.removeItem('depositPreviewData')
+        
+        // 刷新餘額
+        await this.fetchBalance()
+        
+        // 刷新代幣列表
+        await tokenStore.fetchTokens()
+        
+        // 清空所選代幣
+        if (isMultiToken) {
+          tokenStore.clearSelectedFromTokens()
+        } else {
+          tokenStore.reset()
+        }
+        
+        mainStore.showNotification('存款交易成功！', 'success')
+        return { 
+          success: true, 
+          hash: hash,
+          receipt: receipt
+        }
+      } catch (err) {
+        this.error = err.message
+        console.error('Deposit error:', err)
+        mainStore.showNotification(`存款失敗: ${err.message}`, 'error')
+        return { success: false, error: err.message }
+      } finally {
+        this.isLoading = false
+      }
+    },
+
+    // 原始方法保留，以保持向後兼容性
+    async sendDepositTransaction() {
+      // 首先準備交易數據
+      const prepareResult = await this.prepareDepositTransaction();
+      if (!prepareResult.success) {
+        return prepareResult;
+      }
+      
+      // 然後執行交易
+      return await this.executeDepositTransaction();
+    },
+
+    // 格式化代幣金額的輔助函數
+    formatTokenAmount(amount, decimals = 18) {
+      const amountStr = typeof amount === 'bigint' ? amount.toString() : amount
+      const amountNum = parseFloat(amountStr) / Math.pow(10, decimals)
+      return amountNum.toLocaleString('en-US', { 
+        maximumFractionDigits: 6, 
+        minimumFractionDigits: 2 
+      })
     },
 
     setAddress(newAddress) {
