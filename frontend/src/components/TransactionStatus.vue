@@ -1,258 +1,218 @@
 <template>
-    <v-dialog
-      :model-value="visible"
-      @update:model-value="emit('update:visible', $event)"
-      max-width="900"
-      persistent
-    >
-      <v-card class="rounded-lg" style="background-color: #FFF5F5;">
-        <!-- 標題區 -->
-        <div class="text-center pt-6 px-6">
-          <h2 class="text-2xl font-bold" style="color: #FF6B88">{{ status }}</h2>
-          <p class="text-gray-700 text-base mt-2 mb-6">{{ message }}</p>
-        </div>
-  
-        <!-- 進度條 (Grid) -->
-        <div class="progress-grid">
-          <!-- Step 1 (Column 1) -->
-          <div class="circle-wrapper">
-            <div class="circle" :class="circleClass(1)">
-              <template v-if="step === 1">
-                <img src="@/assets/load.gif" class="icon-img" />
-              </template>
-              <template v-else-if="step > 1">
-                <span class="checkmark">✓</span>
-              </template>
-              <template v-else>
-                <span class="status-icon">📤</span>
-              </template>
-            </div>
-          </div>
-  
-          <!-- 線段 1 (Column 2) -->
-          <div class="line-cell">
-            <div class="line" :class="{ completed: step >= 2 }"></div>
-            <template v-if="step === 2">
-              <img src="@/assets/load.gif" alt="Piggy" class="piggy" />
-            </template>
-          </div>
-  
-          <!-- Step 3 (Column 3) -->
-          <div class="circle-wrapper">
-            <div class="circle" :class="circleClass(3)">
-              <template v-if="step === 3">
-                <img src="@/assets/load.gif" class="icon-img" />
-              </template>
-              <template v-else-if="step > 3">
-                <span class="checkmark">✓</span>
-              </template>
-              <template v-else>
-                <span class="status-icon">⏳</span>
-              </template>
-            </div>
-          </div>
-  
-          <!-- 線段 2 (Column 4) -->
-          <div class="line-cell">
-            <div class="line" :class="{ completed: step >= 4 }"></div>
-            <template v-if="step === 4">
-              <img src="@/assets/load.gif" alt="Piggy" class="piggy" />
-            </template>
-          </div>
-  
-          <!-- Step 5 (Column 5) -->
-          <div class="circle-wrapper">
-            <div class="circle" :class="circleClass(5)">
-              <template v-if="step === 5">
-                <img src="@/assets/load.gif" class="icon-img" />
-              </template>
-              <template v-else-if="step > 5">
-                <span class="checkmark">✓</span>
-              </template>
-              <template v-else>
-                <span class="status-icon">🏁</span>
-              </template>
-            </div>
-          </div>
-  
-          <!-- 第二列：標籤 (分別放在 Column 1, 3, 5) -->
-          <div class="label-cell" style="grid-column: 1;">
-            <div class="label">Sent ETH</div>
-            <a href="#" class="link">View transaction</a>
-          </div>
-          <div class="label-cell" style="grid-column: 3;">
-            <div class="label">Order Created</div>
-            <a href="#" class="link">View details</a>
-          </div>
-          <div class="label-cell" style="grid-column: 5;">
-            <div class="label">Receive USDC</div>
-          </div>
-        </div>
-  
-        <!-- OK 按鈕 -->
-        <div class="text-center py-4">
-          <v-btn color="#FFB6C1" text class="px-10 text-white rounded-full" @click="close">
-            OK
-          </v-btn>
-        </div>
-  
-        <!-- 測試按鈕 -->
-        <div class="test-buttons">
-          <button
-            v-for="i in 5"
-            :key="i"
-            class="test-btn"
-            :class="{ active: step === i }"
-            @click="step = i"
-          >
-            步驟 {{ i }}
-          </button>
-        </div>
-      </v-card>
-    </v-dialog>
-  </template>
-  
-  <script setup>
-  import { ref } from 'vue'
-  
-  const props = defineProps({
-    visible: Boolean,
-    status: String,
-    message: String,
-    initialStep: {
-      type: Number,
-      default: 1,
-    },
-  })
-  
-  const emit = defineEmits(['update:visible'])
-  const step = ref(props.initialStep)
-  
-  const close = () => emit('update:visible', false)
-  
-  const circleClass = (targetStep) => {
-    return {
-      active: step.value === targetStep,
-      completed: step.value > targetStep,
-    }
+  <v-card class="status-dialog">
+    <!-- 加載動畫 -->
+    <div class="status-container pa-8" v-if="status === 'pending'">
+      <div class="animation-container">
+        <v-progress-circular
+          indeterminate
+          color="pink"
+          size="64"
+        ></v-progress-circular>
+        <span class="pig-emoji">🐷</span>
+      </div>
+      <h3 class="text-h6 mt-6 text-center">處理中...</h3>
+      <p class="text-body-2 text-center text-grey mt-2">
+        正在將您的資產存入金庫，請稍候...
+      </p>
+    </div>
+
+    <!-- 成功狀態 -->
+    <div class="status-container pa-8" v-else-if="status === 'success'">
+      <div class="animation-container">
+        <v-icon
+          color="success"
+          size="64"
+          class="success-icon"
+        >mdi-check-circle</v-icon>
+        <span class="pig-emoji happy">🐽</span>
+      </div>
+      <h3 class="text-h6 mt-6 text-center">存入成功！</h3>
+      <p class="text-body-2 text-center text-grey mt-2">
+        您的資產已經安全存入金庫
+      </p>
+      <v-btn
+        block
+        class="mt-6 close-button"
+        @click="closeDialog"
+      >
+        完成
+      </v-btn>
+    </div>
+
+    <!-- 失敗狀態 -->
+    <div class="status-container pa-8" v-else-if="status === 'error'">
+      <div class="animation-container">
+        <v-icon
+          color="error"
+          size="64"
+          class="error-icon"
+        >mdi-alert-circle</v-icon>
+        <span class="pig-emoji sad">🐷</span>
+      </div>
+      <h3 class="text-h6 mt-6 text-center">存入失敗</h3>
+      <p class="text-body-2 text-center text-grey mt-2">
+        {{ errorMessage || '交易處理過程中發生錯誤' }}
+      </p>
+      <v-btn
+        block
+        class="mt-6 retry-button"
+        @click="retryTransaction"
+      >
+        重試
+      </v-btn>
+      <v-btn
+        block
+        text
+        class="mt-2"
+        @click="closeDialog"
+      >
+        關閉
+      </v-btn>
+    </div>
+  </v-card>
+</template>
+
+<script setup>
+import { ref } from 'vue'
+
+const props = defineProps({
+  status: {
+    type: String,
+    default: 'pending'  // 'pending', 'success', 'error'
+  },
+  errorMessage: {
+    type: String,
+    default: ''
   }
-  </script>
-  
-  <style scoped>
-  /* 將左右內邊距從15px改為30px */
-  .progress-grid {
-    box-sizing: border-box;
-    display: grid;
-    grid-template-columns: 96px 1fr 96px 1fr 96px; /* 固定 96px (80px 圓 + 8px*2) */
-    grid-template-rows: 96px auto;
-    align-items: center;
-    justify-items: center;
-    gap: 0;
-    width: 900px;
-    padding: 0 30px;
-    margin: 0 auto;
+})
+
+const emit = defineEmits(['retry', 'close'])
+
+function closeDialog() {
+  if (props.status !== 'pending') {
+    emit('close')
   }
-  
-  /* 圓圈部分 */
-  .circle-wrapper {
-    grid-row: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+}
+
+function retryTransaction() {
+  emit('retry')
+}
+</script>
+
+<style scoped>
+.status-dialog {
+  border-radius: 20px;
+  overflow: hidden;
+  background: white;
+  animation: fadeIn 0.3s ease;
+}
+
+.status-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 300px;
+}
+
+.animation-container {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.pig-emoji {
+  position: absolute;
+  font-size: 48px;
+  line-height: 1;
+}
+
+.success-icon {
+  animation: popIn 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+.error-icon {
+  animation: shake 0.5s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+.pig-emoji.happy {
+  animation: bounce 1s infinite;
+}
+
+.pig-emoji.sad {
+  animation: wobble 2s infinite;
+}
+
+.close-button {
+  background: linear-gradient(135deg, #FFB6C1, #FF69B4) !important;
+  color: white !important;
+  font-weight: 600;
+  border-radius: 12px;
+}
+
+.retry-button {
+  background: linear-gradient(135deg, #FFB6C1, #FF69B4) !important;
+  color: white !important;
+  font-weight: 600;
+  border-radius: 12px;
+}
+
+@keyframes popIn {
+  0% {
+    transform: scale(0);
   }
-  .circle {
-    width: 80px;
-    height: 80px;
-    border-radius: 50%;
-    background-color: white;
-    border: 8px solid #FFB6C1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+  70% {
+    transform: scale(1.2);
   }
-  .circle.active {
-    border-color: #FF4081;
+  100% {
+    transform: scale(1);
   }
-  .circle.completed {
-    background-color: #FF4081;
-    border-color: #FF4081;
-    color: white;
+}
+
+@keyframes shake {
+  0%, 100% {
+    transform: translateX(0);
   }
-  .icon-img {
-    width: 72px;
-    height: auto;
-    object-fit: contain;
+  20%, 60% {
+    transform: translateX(-5px);
   }
-  .status-icon,
-  .checkmark {
-    font-size: 30px;
+  40%, 80% {
+    transform: translateX(5px);
   }
-  
-  /* 線段部分 */
-  .line-cell {
-    grid-row: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 100%;
-    height: 100%;
-    position: relative;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
   }
-  .line {
-    width: 100%;
-    height: 4px;
-    background-color: #FFB6C1;
+  50% {
+    transform: translateY(-10px);
   }
-  .line.completed {
-    background-color: #FF4081;
+}
+
+@keyframes wobble {
+  0%, 100% {
+    transform: rotate(0);
   }
-  
-  /* 小豬 (放大 1.5 倍：原 100px → 150px) */
-  .piggy {
-    position: absolute;
-    width: 150px;
-    height: auto;
-    object-fit: contain;
+  25% {
+    transform: rotate(-5deg);
   }
-  
-  /* 標籤部分 (第二列) */
-  .label-cell {
-    grid-row: 2;
-    text-align: center;
+  75% {
+    transform: rotate(5deg);
   }
-  .label {
-    font-size: 16px;
-    font-weight: 500;
-    margin-bottom: 4px;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
   }
-  .link {
-    font-size: 14px;
-    color: #0000ee;
-    text-decoration: none;
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
-  .link:hover {
-    text-decoration: underline;
-  }
-  
-  /* 測試按鈕 */
-  .test-buttons {
-    display: flex;
-    justify-content: center;
-    gap: 8px;
-    padding-bottom: 16px;
-  }
-  .test-btn {
-    padding: 4px 12px;
-    background-color: #f0f0f0;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-    font-size: 12px;
-    cursor: pointer;
-  }
-  .test-btn.active {
-    background-color: #FF4081;
-    color: white;
-    border-color: #FF4081;
-  }
-  </style>
+}
+</style>
   

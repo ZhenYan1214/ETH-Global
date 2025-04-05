@@ -104,12 +104,19 @@
 
     <!-- 保留原有的 History 對話框 -->
     <History :show="showHistory" @update:show="showHistory = $event" />
+    
+    <!-- 添加 4626list 對話框 -->
+    <TokenList4626 
+      v-model="show4626List"
+      @select="handleTokenSelect"
+    />
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import History from '../components/History.vue'
+import TokenList4626 from '../components/4626list.vue'
 import { useWalletStore } from '../store/wallet'
 import { useRouter } from 'vue-router'
 
@@ -118,6 +125,7 @@ const router = useRouter()
 const showHistory = ref(false)
 const showWalletInfo = ref(false)
 const showFeedback = ref(false)
+const show4626List = ref(false)
 
 const feedbackOptions = [
   'I Like Something',
@@ -126,7 +134,7 @@ const feedbackOptions = [
 ]
 
 function openPiggyBank() {
-  console.log('Opening piggy bank...')
+  show4626List.value = true
 }
 
 function handleNavClick(item) {
@@ -145,6 +153,11 @@ function openFeedback() {
 function submitFeedback(option) {
   console.log('Feedback submitted:', option)
   showFeedback.value = false
+}
+
+function handleTokenSelect(token) {
+  console.log('Selected token:', token)
+  // 這裡可以添加選擇代幣後的處理邏輯
 }
 
 onMounted(() => {
