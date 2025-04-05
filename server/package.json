@@ -17,6 +17,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@vitejs/plugin-vue": "^5.2.3",
     "axios": "^1.6.2",
     "cors": "^2.8.5",
     "crypto-js": "^4.2.0",
