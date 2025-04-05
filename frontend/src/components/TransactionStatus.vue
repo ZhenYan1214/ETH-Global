@@ -144,6 +144,18 @@ watch(
     }
   }
 )
+
+// 當 step 達到 5 時，自動關閉並觸發 done 事件
+watch(
+  () => step.value,
+  (newStep) => {
+    if (newStep === 5) {
+      setTimeout(() => {
+        close() // 進度完成後自動關閉
+      }, 1000) // 稍微延遲 1 秒，讓用戶看到最後一步完成
+    }
+  }
+)
 </script>
 
 <style scoped>
