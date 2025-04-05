@@ -11,7 +11,6 @@ const axios = require("axios");
 // 引入路由模組
 const tokensRouter = require("./routes/tokens");
 const convertRouter = require("./routes/convert");
-const historyRouter = require("./routes/history");
 const webhookRouter = require("./routes/webhook");
 
 // 初始化 Express 應用
