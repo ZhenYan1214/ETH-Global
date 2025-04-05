@@ -105,12 +105,36 @@ router.post("/multibaas", (req, res) => {
 router.get("/events/:eventQuery", async (req, res) => {
     try {
       const { eventQuery } = req.params;
-      const { offset = 0, limit = 10 } = req.query;
+      const { offset = 0, limit = 10, userAddress } = req.query;
+      
+      console.log('查詢參數:', { eventQuery, offset, limit, userAddress });
+      
+      // 獲取所有事件
       const result = await queryEvents(eventQuery, offset, limit);
-      const rows = result.result.rows.map(row => {
+      
+      // 過濾事件，只返回與用戶地址相關的事件
+      let rows = result.result.rows;
+      
+      // 如果提供了用戶地址，則過濾結果只顯示該用戶的交易
+      if (userAddress) {
+        const normalizedUserAddress = userAddress.toLowerCase();
+        rows = rows.filter(row => {
+          // 檢查sender是否匹配用戶地址
+          const sender = (row.sender || '').toLowerCase();
+          // 也檢查recipient或其他可能包含用戶地址的字段
+          const recipient = (row.recipient || '').toLowerCase();
+          
+          return sender === normalizedUserAddress || recipient === normalizedUserAddress;
+        });
+        
+        console.log(`已過濾，找到用戶 ${userAddress} 的 ${rows.length} 筆交易`);
+      }
+      
+      // 轉換USDC金額
+      const processedRows = rows.map(row => {
         if (row.assets) {
           const usdAmount = convertUsdcToUsd(row.assets);
-          console.log(`轉換 USDC: ${row.assets} -> ${usdAmount} USD`); // 增加日誌
+          console.log(`轉換 USDC: ${row.assets} -> ${usdAmount} USD`);
           return {
             ...row,
             assets: usdAmount
@@ -118,8 +142,9 @@ router.get("/events/:eventQuery", async (req, res) => {
         }
         return row;
       });
-      console.log('API 返回資料:', rows);
-      res.status(200).json(rows);
+      
+      console.log('API 返回資料:', processedRows);
+      res.status(200).json(processedRows);
     } catch (error) {
       console.error("❌ 發生錯誤：", {
         message: error.message,

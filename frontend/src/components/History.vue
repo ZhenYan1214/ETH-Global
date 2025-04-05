@@ -70,6 +70,7 @@
 import { ref, onMounted, computed } from 'vue';
 import axios from 'axios';
 import closeIcon from '@/assets/search.png'; // Verify path and filename
+import { useWalletStore } from '../store/wallet';
 
 const props = defineProps({
   show: {
@@ -102,13 +103,28 @@ const polygonscanUrl = (address) => {
   return address ? `https://polygonscan.com/address/${address}` : '#';
 };
 
+// 初始化錢包存儲
+const walletStore = useWalletStore();
+
 const fetchTransactions = async () => {
   loading.value = true;
   errorMessage.value = '';
+  
+  // 獲取當前用戶的地址
+  const userAddress = walletStore.address;
+  
+  if (!userAddress) {
+    errorMessage.value = 'Please connect your wallet to view your transactions';
+    loading.value = false;
+    return;
+  }
+
   try {
-    const response = await axios.get('http://localhost:3011/api/webhook/events/bookray', {
+    // 在請求中加入用戶地址作為參數
+    const response = await axios.get(`http://localhost:3011/api/webhook/events/bookray?userAddress=${userAddress}`, {
       timeout: 5000
     });
+    
     console.log('Backend raw data:', response.data);
     const rows = Array.isArray(response.data) ? response.data : response.data.result?.rows || [];
     transactions.value = rows.map(row => {
