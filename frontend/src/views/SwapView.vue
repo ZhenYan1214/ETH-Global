@@ -10,6 +10,7 @@
       @logout="handleLogout"
     />
 
+    <!-- Main Content -->
     <div class="content-container">
       <!-- Notifications -->
       <v-snackbar
@@ -19,7 +20,7 @@
         top
       >
         {{ mainStore.notification.message }}
-        <template #actions>
+        <template v-slot:actions>
           <v-btn text @click="mainStore.clearNotification()">Close</v-btn>
         </template>
       </v-snackbar>
@@ -44,41 +45,152 @@
                 @click="showFromTokenList = true"
                 class="select-btn"
               >
-                {{ tokenStore.selectedFromTokens.length > 0 
-                   ? `Selected ${tokenStore.selectedFromTokens.length} tokens` 
-                   : 'Select Token' }}
+                {{ tokenStore.selectedFromTokens.length > 0 ? 'Selected ' + tokenStore.selectedFromTokens.length + ' tokens' : 'Select Token' }}
                 <v-icon size="small" class="ml-1">mdi-chevron-down</v-icon>
               </v-btn>
             </div>
 
             <!-- Single Select Mode -->
-            <template v-if="tokenStore.selectedFromTokens.length === 0">
-              <SingleTokenCard 
-                v-if="tokenStore.selectedFromToken"
-                :token="tokenStore.selectedFromToken"
-                v-model="tokenStore.fromAmount"
-                @max="setMaxAmount(tokenStore.selectedFromToken.address)"
-              />
-              <EmptyTokenCard v-else />
-            </template>
+            <v-card 
+              v-if="tokenStore.selectedFromTokens.length === 0" 
+              class="token-card mb-2" 
+              elevation="0" 
+              variant="outlined"
+              :class="{'empty-card': !tokenStore.selectedFromToken}"
+            >
+              <div v-if="tokenStore.selectedFromToken" class="d-flex align-center pa-3">
+                <v-avatar size="40" class="mr-3">
+                  <v-img 
+                    :src="getTokenLogo(tokenStore.selectedFromToken.address)" 
+                    @error="handleImageError"
+                  />
+                    </v-avatar>
+                <div class="flex-grow-1">
+                  <div class="d-flex justify-space-between align-center mb-1">
+                    <div>
+                      <div class="text-subtitle-1 font-weight-bold">{{ getTokenSymbol(tokenStore.selectedFromToken.address) }}</div>
+                      <div class="text-caption text-grey">{{ getTokenName(tokenStore.selectedFromToken.address) }}</div>
+                    </div>
+                    <v-chip 
+                      v-if="tokenStore.selectedFromToken.price" 
+                      size="small" 
+                      color="primary" 
+                      variant="flat"
+                      class="price-chip"
+                    >
+                      ${{ formatPrice(tokenStore.selectedFromToken.price) }}
+                    </v-chip>
+                  </div>
+                  <div class="position-relative mt-2">
+                    <v-text-field
+                      v-model="tokenStore.fromAmount"
+                      :label="tokenStore.selectedFromToken ? getTokenSymbol(tokenStore.selectedFromToken.address) : 'Amount'"
+                      variant="underlined"
+                      hide-details
+                      density="compact"
+                      type="number"
+                      min="0"
+                      class="amount-field"
+                    ></v-text-field>
+                    <v-btn
+                      v-if="tokenStore.selectedFromToken"
+                      size="x-small"
+                      density="comfortable"
+                      variant="text"
+                      color="primary"
+                      class="max-btn"
+                      @click="setMaxAmount(tokenStore.selectedFromToken.address)"
+                    >
+                      MAX
+                    </v-btn>
+                  </div>
+                </div>
+              </div>
+              <div v-else class="text-center py-5 empty-token-placeholder">
+                <v-icon size="large" color="grey-lighten-1">mdi-wallet-outline</v-icon>
+                <div class="text-body-2 text-grey mt-2">Please select a token</div>
+          </div>
+            </v-card>
 
             <!-- Multi-Select Mode -->
-            <MultiTokenCard 
-              v-else
-              :tokens="tokenStore.selectedFromTokens"
-              :totalValue="tokenStore.totalFromAmount"
-              @updateAmount="updateFromTokenAmount"
-              @removeToken="tokenStore.toggleFromToken"
-              @max="setMaxAmount"
-            />
+            <v-card v-else class="token-card mb-2" elevation="0" variant="outlined">
+              <v-list density="compact" class="py-0">
+                <v-list-item 
+                  v-for="token in tokenStore.selectedFromTokens" 
+                  :key="token.address"
+                  class="token-list-item py-2"
+                  density="compact"
+                >
+                  <template v-slot:prepend>
+                    <v-avatar size="32" class="mr-2">
+                      <v-img :src="getTokenLogo(token.address)" @error="handleImageError" />
+                    </v-avatar>
+                  </template>
+                  
+                  <v-list-item-title class="d-flex justify-space-between align-center">
+                    <span class="font-weight-medium">{{ getTokenSymbol(token.address) }}</span>
+                    <span class="text-caption text-grey-darken-1">
+                      {{ getDisplayBalance(token) }} available
+                    </span>
+                  </v-list-item-title>
+                  
+                  <template v-slot:append>
+                    <div class="d-flex align-center">
+                      <div class="position-relative">
+              <v-text-field
+                          v-model="token.amount"
+                          :label="getTokenSymbol(token.address)"
+                variant="outlined"
+                          density="compact"
+                hide-details
+                          type="number"
+                          min="0"
+                          class="amount-input mr-2"
+                          style="width: 100px"
+                          @input="updateFromTokenAmount(token.address, $event.target.value)"
+                        ></v-text-field>
+                        <v-btn
+                          size="x-small"
+                          density="comfortable"
+                          variant="text"
+                          color="primary"
+                          class="max-btn-small"
+                          @click="setMaxAmount(token.address)"
+                        >
+                          MAX
+                        </v-btn>
+                      </div>
+                  <v-btn
+                        icon 
+                        size="x-small" 
+                        variant="text" 
+                        color="error"
+                        @click="tokenStore.toggleFromToken(token.address)"
+                        class="ml-1"
+                      >
+                        <v-icon>mdi-close</v-icon>
+                  </v-btn>
+                    </div>
+                </template>
+                </v-list-item>
+              </v-list>
+              
+              <!-- Total Value Display -->
+              <div class="total-value-container px-4 py-3">
+                <span class="text-body-2 font-weight-medium">Total Value</span>
+                <span class="text-subtitle-1 font-weight-bold text-primary">
+                  ${{ formatPrice(tokenStore.totalFromAmount) }}
+                </span>
+            </div>
+            </v-card>
           </section>
 
-          <!-- Swap Arrow -->
+            <!-- Swap Arrow -->
           <div class="swap-arrow-container my-4">
             <v-btn icon size="small" @click="swapTokens" class="swap-arrow-btn" elevation="1">
-              <v-icon>mdi-swap-vertical</v-icon>
-            </v-btn>
-          </div>
+                <v-icon>mdi-swap-vertical</v-icon>
+              </v-btn>
+            </div>
 
           <!-- To Token Input -->
           <section class="to-section mb-5">
@@ -86,18 +198,18 @@
               <h3 class="text-subtitle-1 font-weight-medium">You Will Receive</h3>
             </div>
             
-            <v-text-field
+              <v-text-field
               v-model="tokenStore.toAmount"
-              label="To"
-              variant="outlined"
+                label="To"
+                variant="outlined"
               type="number"
               min="0"
               readonly
               class="to-amount-field"
             >
-              <template #append>
-                <v-btn
-                  class="token-select-btn"
+              <template v-slot:append>
+                  <v-btn
+                    class="token-select-btn"
                   @click="toTokenDialog = true"
                   variant="tonal"
                   rounded
@@ -105,20 +217,20 @@
                   <div v-if="tokenStore.selectedToToken" class="d-flex align-center">
                     <v-avatar size="24" class="mr-1">
                       <v-img
-                        :src="getTokenLogo(tokenStore.selectedToToken.address)"
+                        :src="tokenStore.selectedToToken.logoURI || 'https://via.placeholder.com/24'"
                         @error="handleImageError"
                       />
                     </v-avatar>
-                    <span class="token-symbol ml-1">{{ getTokenSymbol(tokenStore.selectedToToken.address) }}</span>
+                    <span class="token-symbol ml-1">{{ tokenStore.selectedToToken.symbol || '???' }}</span>
                   </div>
                   <span v-else>Select</span>
                   <v-icon size="small" class="ml-1">mdi-chevron-down</v-icon>
-                </v-btn>
-              </template>
-            </v-text-field>
+                  </v-btn>
+                </template>
+              </v-text-field>
           </section>
 
-          <!-- Wallet Info and Swap Button -->
+          <!-- Wallet Information -->
           <div v-if="walletStore.isConnected" class="info-box my-3">
             <div class="d-flex align-center">
               <v-icon size="small" class="mr-1">mdi-wallet</v-icon>
@@ -126,58 +238,218 @@
             </div>
           </div>
 
-          <SwapButton 
-            :buttonText="swapButtonText"
-            :disabled="!walletStore.isConnected ? false : !canSwap"
-            :loading="isSwapping"
-            :step="swapStep"
-            :error="swapError"
-            @click="walletStore.isConnected ? performSwap() : router.push('/')"
-          />
+          <!-- Swap Button -->
+          <div class="swap-btn-container mt-5">
+            <!-- Show Swap Progress Indicator -->
+            <div v-if="isSwapping" class="swap-progress mb-3 w-100">
+              <div class="d-flex flex-column">
+                <div class="d-flex justify-space-between mb-1">
+                  <span class="text-caption">{{ swapStep === 'approving' ? 'Approving Token Usage...' : 'Performing Swap...' }}</span>
+                  <span class="text-caption">{{ swapStep === 'approving' ? '1/2' : '2/2' }}</span>
+                </div>
+                <v-progress-linear indeterminate rounded color="primary" height="4"></v-progress-linear>
+              </div>
+            </div>
+            
+            <!-- Swap Button -->
+          <v-btn
+            block
+              class="swap-btn"
+            size="large"
+              :disabled="!walletStore.isConnected ? false : !canSwap"
+              :loading="isSwapping"
+              @click="walletStore.isConnected ? performSwap() : router.push('/')"
+          >
+              {{ swapButtonText }}
+          </v-btn>
+            
+            <!-- Error Message -->
+            <div v-if="swapError" class="error-message mt-2 text-caption text-center">
+              {{ swapError }}
+            </div>
+          </div>
         </v-card-text>
       </v-card>
     </div>
 
-    <!-- Token Selection Dialogs -->
-    <FromTokenDialog 
-      v-model="showFromTokenList"
-      :tokens="filteredFromTokens"
-      :searchText="fromTokenSearchText"
-      :loading="tokenStore.isLoading"
-      :isSelected="tokenStore.isTokenSelected"
-      :hasSelectedTokens="tokenStore.selectedFromTokens.length > 0"
-      @update:search="fromTokenSearchText = $event"
-      @select="selectTokenWithFullAmount"
-      @clearAll="tokenStore.clearSelectedFromTokens"
-    />
+    <!-- From Token Selection Dialog -->
+    <v-dialog v-model="showFromTokenList" max-width="600" scrollable>
+      <v-card class="token-dialog">
+        <v-toolbar color="primary" density="compact">
+          <v-toolbar-title class="text-white">Select Token (Multi-Select)</v-toolbar-title>
+          <v-spacer></v-spacer>
+          <v-btn 
+            v-if="tokenStore.selectedFromTokens.length > 0"
+            icon 
+            variant="text" 
+            color="white"
+            @click="tokenStore.clearSelectedFromTokens()"
+          >
+            <v-icon>mdi-delete-sweep</v-icon>
+          </v-btn>
+          <v-btn icon variant="text" color="white" @click="showFromTokenList = false">
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
+        </v-toolbar>
+        
+        <!-- Search Field -->
+        <div class="pa-3">
+          <v-text-field
+            v-model="fromTokenSearchText"
+            label="Search Token Symbol, Name, or Address"
+            variant="outlined"
+            density="compact"
+            prepend-inner-icon="mdi-magnify"
+            clearable
+            hide-details
+          ></v-text-field>
+        </div>
+        
+        <!-- Loading State -->
+        <v-card-text v-if="tokenStore.isLoading" class="text-center pa-4">
+          <v-progress-circular indeterminate color="primary"></v-progress-circular>
+          <div class="mt-2">Loading...</div>
+        </v-card-text>
 
-    <ToTokenDialog
-      v-model="toTokenDialog"
-      :tokens="filteredAllTokens"
-      :searchText="tokenSearchText"
-      :loading="tokenStore.isLoadingAllTokens"
-      :selectedToken="tokenStore.selectedToToken?.address"
-      @update:search="tokenSearchText = $event"
-      @select="selectToToken"
-    />
+        <!-- No Token Prompt -->
+        <v-card-text v-else-if="filteredFromTokens.length === 0" class="text-center pa-4">
+          <v-icon size="large" color="grey-lighten-1">mdi-alert-circle-outline</v-icon>
+          <div class="mt-2">No matching tokens</div>
+        </v-card-text>
+
+        <!-- Token List -->
+        <v-card-text v-else class="pa-0">
+          <v-list class="token-list py-0">
+            <v-list-item
+              v-for="token in filteredFromTokens"
+              :key="token.address"
+              class="token-list-item"
+              :class="{'selected-token': tokenStore.isTokenSelected(token.address)}"
+              @click="selectTokenWithFullAmount(token.address)"
+            >
+              <template v-slot:prepend>
+                <v-checkbox
+                  :model-value="tokenStore.isTokenSelected(token.address)"
+                  @click.stop
+                  @change="selectTokenWithFullAmount(token.address)"
+                  density="compact"
+                  hide-details
+                  color="primary"
+                ></v-checkbox>
+                <v-avatar size="32" class="ml-2">
+                  <v-img :src="getTokenLogo(token.address)" @error="handleImageError" />
+                </v-avatar>
+              </template>
+              
+              <v-list-item-title class="font-weight-medium">
+                {{ getTokenSymbol(token.address) }}
+              </v-list-item-title>
+              
+              <v-list-item-subtitle class="text-truncate">
+                {{ getTokenName(token.address) }}
+              </v-list-item-subtitle>
+              
+              <template v-slot:append>
+                <div class="d-flex flex-column align-end">
+                  <span class="text-body-2">{{ getFormattedBalance(token) }} {{ getTokenSymbol(token.address) }}</span>
+                  <span v-if="token.price" class="text-caption text-grey">{{ getFormattedPrice(token) }}</span>
+                </div>
+              </template>
+            </v-list-item>
+          </v-list>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
+
+    <!-- To Token Selection Dialog -->
+    <v-dialog v-model="toTokenDialog" max-width="500">
+      <v-card class="token-dialog">
+        <v-toolbar color="primary" density="compact">
+          <v-toolbar-title class="text-white">
+            <v-icon class="mr-2">mdi-earth</v-icon>
+            All Tokens
+          </v-toolbar-title>
+          <v-spacer></v-spacer>
+          <v-btn icon variant="text" color="white" @click="toTokenDialog = false">
+            <v-icon>mdi-close</v-icon>
+          </v-btn>
+        </v-toolbar>
+        
+        <div class="pa-3">
+          <v-text-field
+            v-model="tokenSearchText"
+            label="Search Token"
+            variant="outlined"
+            density="compact"
+            prepend-inner-icon="mdi-magnify"
+            clearable
+            hide-details
+          ></v-text-field>
+        </div>
+
+        <!-- Loading State -->
+        <v-card-text v-if="tokenStore.isLoadingAllTokens" class="text-center pa-4">
+          <v-progress-circular indeterminate color="primary"></v-progress-circular>
+          <div class="mt-2">Loading...</div>
+        </v-card-text>
+
+        <!-- No Matching Result Prompt -->
+        <v-card-text v-else-if="Object.keys(filteredAllTokens).length === 0" class="text-center pa-4">
+          <v-icon size="large" color="grey-lighten-1">mdi-alert-circle-outline</v-icon>
+          <div class="mt-2">No matching tokens</div>
+        </v-card-text>
+
+        <!-- Token Grid -->
+        <v-card-text v-else class="pa-3">
+          <v-row>
+            <v-col
+              v-for="(token, address) in filteredAllTokens"
+              :key="address"
+              cols="12" sm="6"
+            >
+              <v-card
+                class="token-card"
+                :class="{'selected-token': tokenStore.selectedToToken?.address === address}"
+                variant="outlined"
+                @click="selectToToken(address)"
+              >
+                <div class="d-flex pa-2">
+                  <v-avatar size="36" class="mr-2">
+                    <v-img
+                      :src="token.logoURI || 'https://via.placeholder.com/36'"
+                      @error="handleImageError"
+                    />
+                </v-avatar>
+                  <div class="flex-grow-1">
+                    <div class="d-flex align-center">
+                      <strong class="mr-2">{{ token.symbol || '???' }}</strong>
+                      <v-chip
+                        v-if="token.price"
+                        size="x-small"
+                        color="primary"
+                        variant="flat"
+                      >${{ formatPrice(token.price) }}</v-chip>
+                    </div>
+                    <div class="text-caption text-truncate" style="max-width: 150px">{{ token.name || 'Unknown Token' }}</div>
+                    <div class="text-caption text-grey">{{ formatAddress(address) }}</div>
+                  </div>
+                </div>
+              </v-card>
+            </v-col>
+          </v-row>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, watch, onMounted, defineAsyncComponent } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
+import NavigationBar from '../components/NavigationBar.vue'
+import { useTokenStore } from '../store/tokens'
+import { useWalletStore } from '../store/wallet'
+import { useMainStore } from '../store/main'
 import { useRouter } from 'vue-router'
-import { useTokenStore } from '@/store/tokens'
-import { useWalletStore } from '@/store/wallet'
-import { useMainStore } from '@/store/main'
-import NavigationBar from '@/components/NavigationBar.vue'
-
-// Lazy-load components for better performance
-const SingleTokenCard = defineAsyncComponent(() => import('@/components/swap/SingleTokenCard.vue'))
-const EmptyTokenCard = defineAsyncComponent(() => import('@/components/swap/EmptyTokenCard.vue'))
-const MultiTokenCard = defineAsyncComponent(() => import('@/components/swap/MultiTokenCard.vue'))
-const SwapButton = defineAsyncComponent(() => import('@/components/swap/SwapButton.vue'))
-const FromTokenDialog = defineAsyncComponent(() => import('@/components/swap/FromTokenDialog.vue'))
-const ToTokenDialog = defineAsyncComponent(() => import('@/components/swap/ToTokenDialog.vue'))
 
 // Initialize stores
 const tokenStore = useTokenStore()
@@ -185,46 +457,52 @@ const walletStore = useWalletStore()
 const mainStore = useMainStore()
 const router = useRouter()
 
-// Navigation items
+// Navigation items for the navigation bar
 const navigationItems = [
   { icon: 'mdi-history', title: 'History', route: '/history' }
 ]
 
-// UI state
+// Loading state and UI controls
 const showFromTokenList = ref(false)
 const toTokenDialog = ref(false)
-const fromTokenSearchText = ref('')
-const tokenSearchText = ref('')
-
-// Swap state
 const isSwapping = ref(false)
 const swapStep = ref('initial') // 'initial', 'approving', 'swapping', 'complete', 'error'
 const swapError = ref('')
+const tokenSearchText = ref('')
+const fromTokenSearchText = ref('')
 
-// Computed properties
-const canSwap = computed(() => 
-  walletStore.isConnected && tokenStore.canSwap && !isSwapping.value
-)
+// Computed properties for UI
+const canSwap = computed(() => {
+  const connected = walletStore.isConnected
+  
+  if (!connected) {
+    return false
+  }
+  
+  return tokenStore.canSwap && !isSwapping.value
+})
 
 const swapButtonText = computed(() => {
   if (!walletStore.isConnected) return 'Connect Wallet'
   
-  // Multi-select mode
+  // Determine multi-select and single-select mode
   if (tokenStore.selectedFromTokens.length > 0) {
+    // Multi-select mode
     if (!tokenStore.selectedToToken) return 'Select "To" Token'
+    // Use string comparison instead of parseFloat
     if (!tokenStore.selectedFromTokens.some(t => {
       const amount = t.amount || '0'
       return amount !== '' && amount !== '0'
     })) return 'Enter Amount'
-  } 
-  // Single-select mode
-  else {
+  } else {
+    // Single-select mode
     if (!tokenStore.selectedFromToken || !tokenStore.selectedToToken) return 'Select Tokens'
+    // Use string comparison instead of parseFloat
     const amount = tokenStore.fromAmount || '0'
     if (amount === '' || amount === '0') return 'Enter Amount'
   }
   
-  // Processing states
+  // Common states
   if (isSwapping.value) {
     if (swapStep.value === 'approving') return 'Approving...'
     if (swapStep.value === 'swapping') return 'Swapping...'
@@ -233,220 +511,82 @@ const swapButtonText = computed(() => {
   return 'Swap Now'
 })
 
-// Token filtering
-const filteredFromTokens = computed(() => {
-  if (!fromTokenSearchText.value) return tokenStore.formattedTokens;
-  
-  const searchText = fromTokenSearchText.value.toLowerCase();
-  return tokenStore.formattedTokens.filter(token => {
-    const symbol = getTokenSymbol(token.address).toLowerCase();
-    const name = getTokenName(token.address).toLowerCase();
-    const address = token.address.toLowerCase();
-    return symbol.includes(searchText) || 
-           name.includes(searchText) || 
-           address.includes(searchText);
-  });
-})
-
+// Calculate filtered token list (for To token dialog)
 const filteredAllTokens = computed(() => {
-  if (!tokenStore.allTokens) return {};
+  if (!tokenStore.allTokens) return {}
   
-  // Return limited results for performance
+  // If no search text, return all tokens (but limit quantity for performance)
   if (!tokenSearchText.value) {
-    const topTokens = {};
-    let count = 0;
+    // Only show the first 100 tokens to avoid performance issues
+    const topTokens = {}
+    let count = 0
     
     for (const [address, token] of Object.entries(tokenStore.allTokens)) {
-      if (count >= 100) break;
-      topTokens[address] = token;
-      count++;
+      if (count >= 100) break
+      topTokens[address] = token
+      count++
     }
-    return topTokens;
+    
+    return topTokens
   }
   
-  // Filter by search text
-  const searchText = tokenSearchText.value.toLowerCase();
-  const filtered = {};
+  // Otherwise, filter tokens based on search text
+  const searchText = tokenSearchText.value.toLowerCase()
+  const filtered = {}
   
   for (const [address, token] of Object.entries(tokenStore.allTokens)) {
-    if (address.toLowerCase().includes(searchText) ||
+    // Check if address, name or symbol contains search text
+    if (
+      address.toLowerCase().includes(searchText) ||
       (token.name && token.name.toLowerCase().includes(searchText)) ||
       (token.symbol && token.symbol.toLowerCase().includes(searchText))
     ) {
-      filtered[address] = token;
+      filtered[address] = token
     }
     
-    // Limit results for performance
-    if (Object.keys(filtered).length >= 100) break;
+    // Limit results quantity to improve performance
+    if (Object.keys(filtered).length >= 100) break
   }
   
-  return filtered;
+  return filtered
 })
 
-// Watchers
-watch(() => tokenStore.fromAmount, () => tokenStore.calculateToAmount())
+// Watch for input changes to calculate swap amount
+watch(() => tokenStore.fromAmount, (newValue) => {
+  tokenStore.calculateToAmount()
+})
 
+// Watch for wallet connection changes
 watch(() => walletStore.isConnected, async (isConnected) => {
   if (isConnected) {
     await tokenStore.fetchTokens()
-  } else if (router.currentRoute.value.path !== '/') {
-    router.push('/')
+  } else {
+    // Redirect to login if wallet disconnected
+    if (router.currentRoute.value.path !== '/') {
+      router.push('/')
+    }
   }
 })
 
-// Lifecycle hooks
-onMounted(async () => {
-  if (!walletStore.isConnected) {
-    mainStore.showNotification('Please connect your wallet first', 'warning')
-    router.push('/')
-    return
-  }
-  
-  try {
-    // Initialize token store if needed
-    if (!tokenStore.initialized) {
-      console.log('SwapView: Initializing token store...')
-      await tokenStore.initialize()
-    }
-    
-    // Load tokens and prices
-    await tokenStore.fetchTokens()
-    
-    // Update prices for selected tokens
-    if (tokenStore.selectedFromToken || tokenStore.selectedToToken || 
-        tokenStore.selectedFromTokens.length > 0) {
-      await tokenStore.updateSwapTokenPrices()
-    }
-  } catch (error) {
-    console.error('Failed to fetch tokens:', error)
-    mainStore.showNotification(`Failed to load tokens: ${error.message}`, 'error')
-  }
-})
-
-// Token helpers
-function getTokenSymbol(address) {
-  if (!address) return '???'
-  
-  const userToken = tokenStore.tokens.find(t => 
-    t.address.toLowerCase() === address.toLowerCase())
-  
-  if (userToken?.symbol) return userToken.symbol
-  
-  const tokenInfo = tokenStore.allTokens[address.toLowerCase()]
-  return tokenInfo ? tokenInfo.symbol : '???'
+// UI Functions
+function selectFromToken(address) {
+  tokenStore.selectFromToken(address)
+  showFromTokenList.value = false
 }
 
-function getTokenName(address) {
-  if (!address) return 'Unknown Token'
-  
-  const userToken = tokenStore.tokens.find(t => 
-    t.address.toLowerCase() === address.toLowerCase())
-  
-  if (userToken?.name) return userToken.name
-  
-  const tokenInfo = tokenStore.allTokens[address.toLowerCase()]
-  return tokenInfo ? tokenInfo.name : 'Unknown Token'
-}
-
-function getTokenLogo(address) {
-  if (!address) return 'https://via.placeholder.com/40'
-  
-  const userToken = tokenStore.tokens.find(t => 
-    t.address.toLowerCase() === address.toLowerCase())
-  
-  if (userToken?.logoURI) return userToken.logoURI
-  
-  const tokenInfo = tokenStore.allTokens[address.toLowerCase()]
-  return tokenInfo?.logoURI ? tokenInfo.logoURI : 'https://via.placeholder.com/40'
-}
-
-// Formatting helpers
-function formatBalance(balance, decimals = 18) {
-  const balanceStr = String(balance || '0')
-  if (balanceStr === '' || balanceStr === '0') return '0'
-  
-  try {
-    const normalizedBalance = parseFloat(balanceStr) / Math.pow(10, decimals)
-    return normalizedBalance.toLocaleString('en-US', {
-      maximumFractionDigits: 6,
-      minimumFractionDigits: 0
-    })
-  } catch (e) {
-    console.error('Error formatting balance:', e)
-    return balanceStr
-  }
-}
-
-function formatPrice(price) {
-  if (!price) return '0.00'
-  
-  try {
-    const priceNum = parseFloat(price)
-    return priceNum.toLocaleString('en-US', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2
-    })
-  } catch (e) {
-    console.error('Error formatting price:', e)
-    return '0.00'
-  }
-}
-
-function getDisplayBalance(token) {
-  if (!token || !token.balance) return '0'
-  
-  const tokenInfo = tokenStore.allTokens[token.address.toLowerCase()]
-  const decimals = tokenInfo?.decimals || 18
-  
-  const normalizedBalance = parseFloat(token.balance) / Math.pow(10, decimals)
-  
-  return normalizedBalance.toLocaleString('en-US', {
-    maximumFractionDigits: 6,
-    minimumFractionDigits: 0
-  })
-}
-
-function formatAddress(address) {
-  return address.substring(0, 10) + '...' + address.substring(address.length - 8)
-}
-
-// Action handlers
 function selectToToken(address) {
   tokenStore.selectToToken(address)
   toTokenDialog.value = false
 }
 
-function updateFromTokenAmount(address, amount) {
-  tokenStore.updateFromTokenAmount(address, amount)
-  tokenStore.calculateMultiTokenExchangeRate()
-}
-
-function selectTokenWithFullAmount(address) {
-  const token = tokenStore.tokens.find(t => t.address === address)
-  if (!tokenStore.isTokenSelected(address) && token) {
-    tokenStore.toggleFromToken(address)
-    tokenStore.updateFromTokenAmount(address, token.balance)
-  } else {
-    tokenStore.toggleFromToken(address)
-  }
-}
-
-function setMaxAmount(address) {
-  const token = tokenStore.tokens.find(t => 
-    t.address.toLowerCase() === address.toLowerCase())
-  
-  if (!token) return
-  
-  if (tokenStore.selectedFromTokens.length > 0) {
-    tokenStore.updateFromTokenAmount(address, token.balance)
-  } else {
-    tokenStore.fromAmount = token.balance
-  }
-}
-
 function swapTokens() {
-  if (tokenStore.selectedFromTokens.length > 0) return
-  tokenStore.swapTokens()
+  if (tokenStore.selectedFromTokens.length > 0) {
+    // Multi-select mode, keep original multi-select and To token
+    return;
+  }
+  
+  // Single-select mode, use original swap logic
+  tokenStore.swapTokens();
 }
 
 function handleLogout() {
@@ -454,11 +594,7 @@ function handleLogout() {
   tokenStore.reset()
 }
 
-function handleImageError(event) {
-  event.target.src = 'https://via.placeholder.com/40'
-}
-
-// Swap execution
+// Swap implementation
 async function performSwap() {
   if (!walletStore.isConnected) {
     mainStore.showNotification('Please connect your wallet first', 'warning')
@@ -475,21 +611,29 @@ async function performSwap() {
   try {
     mainStore.showNotification('Preparing to swap tokens...', 'info')
     
-    const result = await walletStore.sendSwapTransaction({ paymaster: true })
+    // Use wallet store's sendSwapTransaction method to execute swap
+    const result = await walletStore.sendSwapTransaction({
+      paymaster: true
+    })
     
     if (!result.success) {
       throw new Error(result.error || 'Swap failed')
     }
     
     swapStep.value = 'swapping'
+    
+    // Swap successful
     swapStep.value = 'complete'
     mainStore.showNotification('Token swap successful!', 'success')
     
+    // Refresh token balances
     await tokenStore.fetchTokens()
   } catch (error) {
     console.error('Swap failed:', error)
     swapStep.value = 'error'
     swapError.value = error.message || 'Swap failed'
+    
+    // Show error message
     mainStore.showNotification(swapError.value, 'error')
   } finally {
     isSwapping.value = false
@@ -499,6 +643,247 @@ async function performSwap() {
       }
     }, 3000)
   }
+}
+
+// Initialize the component
+onMounted(async () => {
+  // Check if wallet is connected
+  if (!walletStore.isConnected) {
+    mainStore.showNotification('Please connect your wallet first', 'warning')
+    router.push('/')
+  } else {
+    try {
+      // Ensure token list is initialized
+      if (!tokenStore.initialized) {
+        console.log('SwapView: Token store not initialized yet, initializing now...')
+        await tokenStore.initialize()
+      } else {
+        console.log('SwapView: Using already initialized token store')
+      }
+      
+      // Get current wallet token balances
+      await tokenStore.fetchTokens()
+      
+      // If tokens are already selected, update their prices
+      if (tokenStore.selectedFromToken || tokenStore.selectedToToken || tokenStore.selectedFromTokens.length > 0) {
+        console.log('SwapView: Updating selected token prices')
+        await tokenStore.updateSwapTokenPrices()
+      }
+    } catch (error) {
+      console.error('Failed to fetch tokens on mount:', error)
+      mainStore.showNotification(`Failed to load tokens: ${error.message}`, 'error')
+    }
+  }
+})
+
+function getTokenSymbol(address) {
+  if (!address) return '???';
+  
+  // First try to find in user tokens
+  const userToken = tokenStore.tokens.find(t => t.address.toLowerCase() === address.toLowerCase());
+  if (userToken && userToken.symbol) return userToken.symbol;
+  
+  // If not found in user tokens, look in allTokens
+  const tokenInfo = tokenStore.allTokens[address.toLowerCase()];
+  return tokenInfo ? tokenInfo.symbol : '???';
+}
+
+function selectFromTokenByAddress(address, token) {
+  tokenStore.selectFromToken(token)
+  showFromTokenList.value = false
+}
+
+function retryFetchTokens() {
+  tokenStore.fetchTokens()
+}
+
+function handleImageError(event) {
+  event.target.src = 'https://via.placeholder.com/40'
+}
+
+function formatBalance(balance, decimals = 18) {
+  // Ensure input is a string
+  const balanceStr = String(balance || '0');
+  
+  // Empty string or '0' directly returns '0'
+  if (balanceStr === '' || balanceStr === '0') return '0';
+  
+  try {
+    // Convert from smallest unit (wei) to normal unit based on decimals
+    const normalizedBalance = parseFloat(balanceStr) / Math.pow(10, decimals);
+    
+    // Format with appropriate decimal places
+    return normalizedBalance.toLocaleString('en-US', {
+      maximumFractionDigits: 6,
+      minimumFractionDigits: 0
+    });
+  } catch (e) {
+    console.error('Error formatting balance:', e);
+    return balanceStr;
+  }
+}
+
+function formatPrice(price) {
+  if (!price) return '0.00';
+  
+  try {
+    const priceNum = parseFloat(price);
+    return priceNum.toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  } catch (e) {
+    console.error('Error formatting price:', e);
+    return '0.00';
+  }
+}
+
+function formatAddress(address) {
+  // Implement the logic to format the address
+  return address.substring(0, 10) + '...' + address.substring(address.length - 8)
+}
+
+// New computed properties and functions
+const filteredFromTokens = computed(() => {
+  if (!fromTokenSearchText.value) {
+    // If no search term, return user tokens and popular tokens
+    return tokenStore.formattedTokens;
+  }
+  
+  const searchText = fromTokenSearchText.value.toLowerCase();
+  
+  // First search in user tokens
+  const filteredUserTokens = tokenStore.formattedTokens.filter(token => {
+    const symbol = getTokenSymbol(token.address).toLowerCase();
+    const name = getTokenName(token.address).toLowerCase();
+    const address = token.address.toLowerCase();
+    
+    return symbol.includes(searchText) || 
+           name.includes(searchText) || 
+           address.includes(searchText);
+  });
+  
+  return filteredUserTokens;
+})
+
+function updateFromTokenAmount(address, amount) {
+  // 直接使用用户输入的数字，不做转换
+  // 代币金额将在计算时根据小数位进行处理
+  tokenStore.updateFromTokenAmount(address, amount);
+  
+  // 更新界面显示
+  tokenStore.calculateMultiTokenExchangeRate();
+}
+
+function getTokenLogo(address) {
+  if (!address) return 'https://via.placeholder.com/40';
+  
+  // First try to find in user tokens
+  const userToken = tokenStore.tokens.find(t => t.address.toLowerCase() === address.toLowerCase());
+  if (userToken && userToken.logoURI) return userToken.logoURI;
+  
+  // If not found in user tokens, look in allTokens
+  const tokenInfo = tokenStore.allTokens[address.toLowerCase()];
+  return tokenInfo && tokenInfo.logoURI ? tokenInfo.logoURI : 'https://via.placeholder.com/40';
+}
+
+function getTokenName(address) {
+  if (!address) return 'Unknown Token';
+  
+  // First try to find in user tokens
+  const userToken = tokenStore.tokens.find(t => t.address.toLowerCase() === address.toLowerCase());
+  if (userToken && userToken.name) return userToken.name;
+  
+  // If not found in user tokens, look in allTokens
+  const tokenInfo = tokenStore.allTokens[address.toLowerCase()];
+  return tokenInfo ? tokenInfo.name : 'Unknown Token';
+}
+
+function selectTokenWithFullAmount(address) {
+  const token = tokenStore.tokens.find(t => t.address === address);
+  if (!tokenStore.isTokenSelected(address) && token) {
+    // If not yet selected, select it with maximum amount (keep string format)
+    tokenStore.toggleFromToken(address);
+    tokenStore.updateFromTokenAmount(address, token.balance);
+  } else {
+    // If already selected, deselect it
+    tokenStore.toggleFromToken(address);
+  }
+}
+
+function setMaxAmount(address) {
+  const token = tokenStore.tokens.find(t => t.address.toLowerCase() === address.toLowerCase());
+  if (token) {
+    // Get token decimals
+    const tokenInfo = tokenStore.allTokens[address.toLowerCase()];
+    const decimals = tokenInfo?.decimals || 18;
+    
+    if (tokenStore.selectedFromTokens.length > 0) {
+      // Multi-select mode - keep original string format
+      tokenStore.updateFromTokenAmount(address, token.balance);
+    } else {
+      // Single-select mode - keep original string format
+      tokenStore.fromAmount = token.balance;
+    }
+  }
+}
+
+// Add helper functions to get formatted values with proper decimal handling
+function getFormattedBalance(token) {
+  if (!token) return '0';
+  
+  // Get token decimals
+  const tokenInfo = tokenStore.allTokens[token.address.toLowerCase()];
+  const decimals = tokenInfo?.decimals || 18;
+  
+  if (token.formattedBalance) return token.formattedBalance;
+  return formatBalance(token.balance, decimals);
+}
+
+function getFormattedPrice(token) {
+  if (!token || !token.price) return '$0.00';
+  
+  if (token.formattedPrice) return token.formattedPrice;
+  return '$' + formatPrice(token.price);
+}
+
+function getFormattedValue(token) {
+  if (!token) return '$0.00';
+  
+  if (token.valueUSD) return token.valueUSD;
+  
+  // Calculate value if not provided
+  if (token.balance && token.price) {
+    // Get token decimals
+    const tokenInfo = tokenStore.allTokens[token.address.toLowerCase()];
+    const decimals = tokenInfo?.decimals || 18;
+    
+    // Calculate normalized balance
+    const normalizedBalance = parseFloat(token.balance) / Math.pow(10, decimals);
+    const value = normalizedBalance * parseFloat(token.price);
+    
+    return '$' + formatPrice(value);
+  }
+  
+  return '$0.00';
+}
+
+// 新增函数来格式化显示余额
+function getDisplayBalance(token) {
+  if (!token || !token.balance) return '0';
+  
+  // 获取代币小数位
+  const tokenInfo = tokenStore.allTokens[token.address.toLowerCase()];
+  const decimals = tokenInfo?.decimals || 18;
+  
+  // 将最小单位转换为标准单位
+  const normalizedBalance = parseFloat(token.balance) / Math.pow(10, decimals);
+  
+  // 格式化显示
+  return normalizedBalance.toLocaleString('en-US', {
+    maximumFractionDigits: 6,
+    minimumFractionDigits: 0
+  });
 }
 </script>
 
@@ -551,6 +936,20 @@ async function performSwap() {
   font-weight: 500;
 }
 
+.empty-card {
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.token-card {
+  border-radius: 12px;
+  transition: all 0.2s ease-in-out;
+  border: 1px solid rgba(255, 153, 153, 0.2);
+  overflow: hidden;
+}
+
 .swap-arrow-container {
   display: flex;
   justify-content: center;
@@ -576,8 +975,106 @@ async function performSwap() {
   border: 1px solid rgba(255, 153, 153, 0.1);
 }
 
+.swap-btn {
+  background: linear-gradient(45deg, #FF9999, #FFB6C1);
+  color: white;
+  border-radius: 12px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 10px rgba(255, 153, 153, 0.2);
+  height: 48px;
+}
+
+.swap-btn:hover {
+  box-shadow: 0 6px 15px rgba(255, 153, 153, 0.3);
+}
+
+.token-list-item {
+  border-radius: 8px;
+  margin: 4px 0;
+  transition: background-color 0.2s ease;
+}
+
+.token-list-item:hover {
+  background-color: rgba(255, 153, 153, 0.05);
+}
+
+.selected-token {
+  background-color: rgba(255, 153, 153, 0.08) !important;
+  border-color: rgba(255, 153, 153, 0.3) !important;
+}
+
+.amount-input :deep(.v-field__outline) {
+  --v-field-border-width: 1px !important;
+}
+
+.amount-field {
+  font-size: 1.1rem;
+}
+
+.token-list {
+  max-height: 400px;
+  overflow-y: auto;
+  border-radius: 0;
+}
+
 .token-symbol {
   font-weight: 600;
+}
+
+.token-dialog {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.total-value-container {
+  background-color: rgba(255, 153, 153, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 1px solid rgba(255, 153, 153, 0.1);
+}
+
+.price-chip {
+  font-size: 0.75rem;
+}
+
+.max-btn {
+  position: absolute;
+  right: 0;
+  top: 4px;
+  font-size: 0.65rem;
+  font-weight: bold;
+}
+
+.max-btn-small {
+  position: absolute;
+  right: 35px;
+  top: 2px;
+  font-size: 0.65rem;
+  font-weight: bold;
+}
+
+.swap-btn-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.swap-progress {
+  width: 100%;
+  margin-bottom: 1rem;
+}
+
+.error-message {
+  color: #ff5252;
+  font-size: 0.8rem;
+  margin-top: 0.75rem;
+}
+
+.empty-token-placeholder {
+  opacity: 0.7;
 }
 
 @media (max-width: 600px) {

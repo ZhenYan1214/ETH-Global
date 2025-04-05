@@ -332,7 +332,7 @@ export const useTokenStore = defineStore('tokens', {
           const price = priceMap[address] || '0';
           
           const tokenInfo = {
-            address: token.token,
+          address: token.token,
             balance: token.balance,
             price: price
           };
