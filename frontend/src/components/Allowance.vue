@@ -435,44 +435,52 @@ function handleClose() {
   }
 }
 
+// 確認存款
 async function handleConfirmDeposit() {
-  if (isConfirming.value) return
-  
   try {
-    isConfirming.value = true
+    // 提示用戶確認存款
+    if (!confirm('確定要進行存款操作嗎？')) {
+      return;
+    }
     
     // 關閉當前對話框
-    dialogModel.value = false
+    dialogModel.value = false;
     
-    // 等待對話框關閉動畫
-    await new Promise(resolve => setTimeout(resolve, 300))
+    // 向父組件發送顯示交易狀態的事件
+    emit('showTransactionStatus');
     
-    // 顯示交易狀態對話框
-    showTransactionStatus.value = true
+    // 等待對話框關閉的過渡動畫
+    await new Promise(resolve => setTimeout(resolve, 300));
     
-    // 發出事件，通知父組件顯示交易狀態
-    emit('showTransactionStatus', true)
-    
-    // 執行存款交易
-    const result = await vaultStore.executeDeposit()
-    
-    if (result) {
-      transactionStatus.value = 'success'
-      transactionMessage.value = '存款交易已成功！'
-      transactionHash.value = vaultStore.transactionHash || ''
-      
-      // 更新代幣餘額
-      await tokenStore.fetchTokens()
-    } else {
-      transactionStatus.value = 'error'
-      transactionMessage.value = vaultStore.error || '存款交易失敗'
+    if (!vaultStore.depositPreview) {
+      throw new Error('沒有存款預覽數據');
     }
+    
+    // 準備代幣資料
+    let tokens = [];
+    
+    if (multipleTokens.value) {
+      // 多選模式
+      tokens = tokenStore.selectedFromTokens
+        .filter(t => t && t.amount && parseFloat(t.amount) > 0)
+        .map(t => ({
+          address: t.address,
+          amount: t.amount
+        }));
+    } else if (tokenStore.selectedFromToken) {
+      // 單選模式
+      tokens = [{
+        address: tokenStore.selectedFromToken.address,
+        amount: tokenStore.fromAmount
+      }];
+    }
+    
+    // 調用存款執行方法
+    console.log('執行存款操作，tokens:', tokens);
+    await vaultStore.executeDeposit(tokens);
   } catch (error) {
-    console.error('存款失敗:', error)
-    transactionStatus.value = 'error'
-    transactionMessage.value = error.message || '交易處理時發生錯誤'
-  } finally {
-    isConfirming.value = false
+    console.error('確認存款時發生錯誤:', error);
+    mainStore.showNotification('存款確認失敗: ' + (error.message || '未知錯誤'), 'error');
   }
 }
 

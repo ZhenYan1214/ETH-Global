@@ -134,21 +134,22 @@
     />
 
     <!-- TransactionStatus 對話框 -->
-    <v-dialog 
-      v-model="showTransactionStatus" 
-      max-width="400"
-      :persistent="transactionStatus === 'pending'"
-      @click:outside="handleTransactionDialogClose"
-    >
-      <TransactionStatus
-        :status="transactionStatus"
-        :error-message="errorMessage"
-        @retry="handleRetry"
-        @close="handleTransactionClose"
-      />
-    </v-dialog>
+    <TransactionStatus
+      v-model:visible="showTransactionStatusDialog"
+      :status="transactionStatus"
+      :message="transactionMessage"
+      :hash="transactionHash"
+      :receipt="transactionReceipt"
+      @done="handleTransactionDone"
+    />
 
-    <Finish v-if="showFinish" @close="showFinish = false" />
+    <!-- Finish 對話框 -->
+    <Finish 
+      v-model:show="showFinishDialog" 
+      :to-amount="receivedAmount"
+      :transaction-hash="transactionHash"
+      :receipt="transactionReceipt"
+    />
   </div>
 </template>
 
@@ -177,11 +178,13 @@ const tokenStore = useTokenStore()
 const walletStore = useWalletStore()
 const searchText = ref('')
 const showAllowanceDialog = ref(false)
-const showTransactionStatus = ref(false)
-const showFinish = ref(false)
+const showTransactionStatusDialog = ref(false)
+const showFinishDialog = ref(false)
 const transactionStatus = ref('pending')
-const transactionMessage = ref('處理存款中...')
+const transactionMessage = ref('交易處理中，請稍候...')
 const transactionHash = ref('')
+const transactionReceipt = ref(null)
+const receivedAmount = ref('0')
 const errorMessage = ref('')
 const vaultStore = useVaultStore()
 
@@ -408,52 +411,64 @@ function goToVault() {
   }
 }
 
-async function handleShowTransactionStatus(show) {
-  showTransactionStatus.value = show;
-  const vaultStore = useVaultStore();
+// 處理交易狀態顯示
+function handleShowTransactionStatus() {
+  console.log('顯示交易狀態')
+  showTransactionStatusDialog.value = true
+  transactionStatus.value = 'pending'
+  transactionMessage.value = '交易處理中，請稍候...'
+  transactionHash.value = ''
+  transactionReceipt.value = null
   
-  // 如果 Allowance 組件發送了顯示狀態，但我們需要顯示自己的狀態對話框
-  if (show) {
-    // 關閉 Allowance 對話框
-    showAllowanceDialog.value = false;
+  // 監聽交易狀態變化
+  vaultStore.$subscribe((mutation, state) => {
+    console.log('Vault store 狀態變化:', state.depositStatus, state.transactionHash, state.depositReceipt)
     
-    // 等待對話框關閉動畫
-    await new Promise(resolve => setTimeout(resolve, 300));
-    
-    // 顯示交易狀態對話框
-    showTransactionStatus.value = true;
-    
-    // 設置初始狀態
-    transactionStatus.value = vaultStore.depositStatus || 'pending';
-    transactionMessage.value = "處理存款中...";
-    transactionHash.value = vaultStore.transactionHash;
-  }
-  
-  // 監聽存款狀態的變化
-  if (vaultStore.depositStatus === 'success') {
-    transactionStatus.value = 'success';
-    transactionMessage.value = '存款交易已成功！';
-    transactionHash.value = vaultStore.transactionHash || '';
-  } else if (vaultStore.depositStatus === 'error') {
-    transactionStatus.value = 'error';
-    transactionMessage.value = vaultStore.error || '存款交易失敗';
-  }
+    if (state.depositStatus === 'processing' && state.transactionHash) {
+      transactionStatus.value = 'pending'
+      transactionMessage.value = '交易已提交，等待確認...'
+      transactionHash.value = state.transactionHash
+    } 
+    else if (state.depositStatus === 'success') {
+      transactionStatus.value = 'success'
+      transactionMessage.value = '交易已確認！'
+      
+      // 只有在收到收據後才設置 receipt
+      if (state.depositReceipt) {
+        console.log('收到交易收據:', state.depositReceipt)
+        transactionReceipt.value = state.depositReceipt
+        
+        // 設置接收到的金額，用於完成頁面顯示
+        if (vaultStore.depositPreview && vaultStore.depositPreview.dstAmount) {
+          receivedAmount.value = formatDisplayAmount(vaultStore.depositPreview.dstAmount)
+        }
+      }
+    } 
+    else if (state.depositStatus === 'error') {
+      transactionStatus.value = 'error'
+      transactionMessage.value = `交易失敗: ${state.error || '未知錯誤'}`
+    }
+  })
 }
 
-function handleTransactionDialogClose() {
-  if (transactionStatus.value !== 'pending') {
-    showTransactionStatus.value = false
-  }
-}
-
-function handleTransactionClose() {
-  showTransactionStatus.value = false
+// 處理交易完成後的行為
+function handleTransactionDone() {
+  console.log('交易完成，狀態:', transactionStatus.value)
   
-  // 如果交易成功，清空選擇的代幣並更新代幣列表
+  // 檢查交易狀態
   if (transactionStatus.value === 'success') {
-    tokenStore.clearSelectedFromTokens()
-    tokenStore.fetchTokens()
+    console.log('顯示完成頁面')
+    showFinishDialog.value = true
   }
+  
+  // 重置交易相關狀態
+  transactionStatus.value = 'pending'
+  transactionMessage.value = '交易處理中，請稍候...'
+  transactionHash.value = ''
+  transactionReceipt.value = null
+  
+  // 取消訂閱
+  vaultStore.$reset()
 }
 
 async function handleRetry() {
@@ -462,7 +477,7 @@ async function handleRetry() {
   
   try {
     // 尝试重新关闭窗口并从 Allowance 开始
-    showTransactionStatus.value = false
+    showTransactionStatusDialog.value = false
     await new Promise(resolve => setTimeout(resolve, 300))
     
     // 重新打开 Allowance 弹窗
@@ -471,10 +486,6 @@ async function handleRetry() {
     transactionStatus.value = 'error'
     errorMessage.value = error.message || '重试失败'
   }
-}
-
-const openFinish = () => {
-  showFinish.value = true
 }
 
 // 組件掛載時，如果錢包已連接則獲取代幣列表

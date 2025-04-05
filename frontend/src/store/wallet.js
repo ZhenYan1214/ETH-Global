@@ -662,6 +662,7 @@ export const useWalletStore = defineStore('wallet', {
         }
         
         const calls = [...approveCalls, ...depositCalls, approveContractCall, depositContractCall]
+        console.log("calls",calls)
         if ((thresold + totalDstAmount) >= 1000000000) {
           calls.push(investContractCall)
         }

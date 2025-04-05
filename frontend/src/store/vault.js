@@ -32,7 +32,10 @@ export const useVaultStore = defineStore('vault', {
     depositPreview: null,
     depositStatus: null,
     transactionHash: null,
-    isTransacting: false
+    depositReceipt: null,
+    isTransacting: false,
+    apiBaseUrl: import.meta.env.VITE_API_URL || 'http://localhost:3011',
+    apiEnabled: true
   }),
 
   getters: {
@@ -117,63 +120,81 @@ export const useVaultStore = defineStore('vault', {
     },
     
     // 新增：執行存款交易
-    async executeDeposit() {
-      this.isTransacting = true;
-      this.depositStatus = 'pending';
-      this.error = null;
+    async executeDeposit(tokens) {
+      // 重置上次的狀態
+      this.depositStatus = null
+      this.transactionHash = null
+      this.depositReceipt = null
+      this.error = null
+      this.isTransacting = true
       
-      const walletStore = useWalletStore();
-      const mainStore = useMainStore();
-      
-      if (!walletStore.isConnected) {
-        this.error = '請先連接錢包';
-        this.isTransacting = false;
-        this.depositStatus = 'error';
-        mainStore.showNotification('請先連接錢包', 'error');
-        return false;
-      }
-      
-      if (!this.depositPreview) {
-        this.error = '沒有存款預覽數據';
-        this.isTransacting = false;
-        this.depositStatus = 'error';
-        mainStore.showNotification('沒有存款預覽數據', 'error');
-        return false;
-      }
+      const mainStore = useMainStore()
+      const walletStore = useWalletStore()
       
       try {
-        // 調用 walletStore 的 executeDepositTransaction 方法執行實際交易
-        console.log("執行存款交易");
-        
-        // 執行存款交易
-        const result = await walletStore.executeDepositTransaction();
-        
-        if (result && result.success) {
-          // 交易成功
-          this.depositStatus = 'success';
-          this.transactionHash = result.hash || ('0x' + Math.random().toString(16).substring(2, 42));
-          
-          mainStore.showNotification('存款交易成功！', 'success');
-          return true;
-        } else {
-          // 交易失敗
-          throw new Error(result?.error || '交易執行失敗');
+        if (!walletStore.isConnected) {
+          throw new Error('請先連接錢包')
         }
-      } catch (err) {
-        this.error = err.message;
-        this.depositStatus = 'error';
-        console.error('存款交易失敗:', err);
-        mainStore.showNotification('存款交易失敗: ' + err.message, 'error');
-        return false;
+        
+        if (!tokens || tokens.length === 0) {
+          throw new Error('請先選擇代幣')
+        }
+        
+        this.depositStatus = 'processing'
+        console.log('正在處理存款交易，tokens:', tokens)
+        
+        // 通過 Wallet 發送存款交易
+        const result = await walletStore.sendDepositTransaction(tokens)
+        console.log('存款交易結果:', result)
+        
+        // 設置交易哈希
+        if (result && result.transactionHash) {
+          this.transactionHash = result.transactionHash
+          console.log('交易已提交，交易哈希:', this.transactionHash)
+          
+          // 等待交易確認並獲取收據
+          try {
+            console.log('等待交易確認...')
+            const receipt = await walletStore.provider.waitForTransaction(this.transactionHash)
+            console.log('交易已確認，receipt:', receipt)
+            this.depositReceipt = receipt
+            
+            // 檢查交易是否成功
+            if (receipt && receipt.status === 1) {
+              this.depositStatus = 'success'
+              mainStore.showNotification('存款交易成功！', 'success')
+            } else {
+              throw new Error('交易執行失敗')
+            }
+          } catch (confirmError) {
+            console.error('交易確認錯誤:', confirmError)
+            throw new Error(`交易確認失敗: ${confirmError.message}`)
+          }
+        } else {
+          throw new Error('未能獲取交易哈希')
+        }
+        
+        return {
+          transactionHash: this.transactionHash,
+          receipt: this.depositReceipt
+        }
+      } catch (error) {
+        console.error('存款執行錯誤:', error)
+        this.error = error.message || '存款交易失敗'
+        this.depositStatus = 'error'
+        mainStore.showNotification(`存款失敗: ${this.error}`, 'error')
+        throw error
       } finally {
-        this.isTransacting = false;
+        this.isTransacting = false
       }
     },
     
+    // 修改 resetDepositState 方法，添加 depositReceipt 重置
     resetDepositState() {
       this.depositPreview = null;
       this.depositStatus = null;
       this.transactionHash = null;
+      this.depositReceipt = null;
       this.error = null;
       this.isTransacting = false;
     },
