@@ -51,6 +51,19 @@ export const useWalletStore = defineStore('wallet', {
   },
 
   actions: {
+    async getUserVaultWithdrawable() {
+      if (!this.client || !this.address) return BigInt(0)
+
+      const amount = await this.client.readContract({
+        abi: vaultStore.abi,
+        address: vaultStore.valutAddress,
+        functionName: 'previewRedeemValue',
+        args: [this.address]
+      })
+
+      return amount
+    },
+
     async getUserUSDCBalance() {
       if (!this.client || !this.address) return BigInt(0)
 
