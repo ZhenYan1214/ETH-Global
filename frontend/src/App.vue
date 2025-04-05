@@ -2,6 +2,8 @@
 import { ref, onMounted } from 'vue'
 import { useTokenStore } from './store/tokens'
 
+const showModal = ref(false)
+
 const theme = {
   primary: '#FF9999', // 溫柔的粉紅色
   secondary: '#FFB6C1', // 淺粉紅
