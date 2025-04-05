@@ -1,5 +1,6 @@
 // 載入環境變數
 require("dotenv").config();
+const { Server } = require('ws');
 
 // 引入所需模組
 const express = require("express");
@@ -7,6 +8,7 @@ const cors = require("cors");
 const morgan = require("morgan");
 const helmet = require("helmet");
 const axios = require("axios");
+const http = require("http");
 
 // 引入路由模組
 const tokensRouter = require("./routes/tokens");
@@ -16,6 +18,19 @@ const webhookRouter = require("./routes/webhook");
 // 初始化 Express 應用
 const app = express();
 const PORT = process.env.PORT || 3011;
+
+const server = http.createServer(app); // 用 HTTP server 包 Express
+const wss = new Server({ server });    // 啟動 WebSocket Server
+
+// 存下來給 webhook.js 用
+app.set('wss', wss); 
+
+// WebSocket 連線處理
+wss.on('connection', (ws) => {
+  console.log('🟢 前端連上 WebSocket');
+
+  ws.send(JSON.stringify({ message: '已連上 Piggy WebSocket 🎉' }));
+});
 
 // 添加安全相關中間件
 app.use(helmet()); // 安全標頭
@@ -66,7 +81,7 @@ app.use((req, res) => {
 
 // 啟動伺服器
 app.listen(PORT, () => {
-  console.log(`伺服器運行於 http://localhost:${PORT}`);
+  console.log(`API&Webhook伺服器運行於 http://localhost:${PORT}`);
   console.log(`環境: ${process.env.NODE_ENV || 'development'}`);
   
   // 在開發環境中顯示可用的 API 路由
