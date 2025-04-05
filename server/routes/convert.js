@@ -43,6 +43,7 @@ async function apiRequest(url, config, tag = 'API') {
 
 async function getSwapData(tokenAddress, userAddress, amount, chainId, dstTokenAddress) {
   const url = `https://api.1inch.dev/swap/v6.0/${chainId}/swap`
+  console.log('tokenAddress:', tokenAddress, 'dstTokenAddress:', dstTokenAddress, 'amount:', amount, 'userAddress:', userAddress, 'chainId:', chainId)
   const config = {
     headers: {
       'Authorization': `Bearer ${INCH_API_KEY}`
@@ -64,8 +65,9 @@ async function getSwapData(tokenAddress, userAddress, amount, chainId, dstTokenA
 }
 
 async function getTokenApprove(tokenAddress, amount, chainId) {
+  console.log('Parameters:', { tokenAddress, amount, chainId });
   const url = `https://api.1inch.dev/swap/v6.0/${chainId}/approve/transaction`;
-
+  console.log(tokenAddress, amount, chainId)
   const config = {
     headers: {
       'Authorization': `Bearer ${INCH_API_KEY}`
@@ -82,6 +84,7 @@ async function getTokenApprove(tokenAddress, amount, chainId) {
 router.post('/approve', async (req, res, next) => {
   try {
     const {chainId, tokens, amounts} = req.body
+
     if (tokens.length != amounts.length) {
         return res.status(400).json({
             status: 'error',
