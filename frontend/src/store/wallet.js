@@ -6,8 +6,9 @@ import {
   toCircleSmartAccount,
   WebAuthnMode
 } from '@circle-fin/modular-wallets-core'
+import { encodeFunctionData } from 'viem'
 import {
-  createPublicClient,
+  createPublicClient,erc20Abi 
 } from 'viem'
 import {
   createBundlerClient,
@@ -17,6 +18,8 @@ import { polygon } from 'viem/chains'
 import { useMainStore } from './main'
 import { useTokenStore } from './tokens'
 import api from '../utils/api'
+import { useVaultStore } from './vault'
+import { ethers } from 'ethers'
 
 export const useWalletStore = defineStore('wallet', {
   state: () => ({
@@ -35,7 +38,8 @@ export const useWalletStore = defineStore('wallet', {
     credential: null,
     balance: '0',
     usernameInput: '',
-    isRegistering: false
+    isRegistering: false,
+    usdcAddress:"0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"
   }),
 
   getters: {
@@ -47,6 +51,12 @@ export const useWalletStore = defineStore('wallet', {
   },
 
   actions: {
+    async getUserUSDCBalance() {
+      const balance = await this.client.getBalance({
+        address: this.usdcAddress
+      })
+      return balance
+    },
     async connect(username = this.usernameInput) {
       if (!username) {
         this.error = 'Username is required'
@@ -140,11 +150,14 @@ export const useWalletStore = defineStore('wallet', {
         return '0'
       }
     },
+    
 
     async sendSwapTransaction({paymaster = true, maxFeePerGas = BigInt(50000000000), maxPriorityFeePerGas = BigInt(35000000000) }) {
       if (!this.isReady) {
         throw new Error('錢包未連接')
       }
+      const vaultStore = useVaultStore()
+
       
       this.isLoading = true
       this.error = null
@@ -191,7 +204,7 @@ export const useWalletStore = defineStore('wallet', {
         }
         
         console.log('Approve Payload:', approvePayload)
-        
+        console.log("SMA",this.smartAccount)
         // 調用approve API
         mainStore.showNotification('正在批准代幣使用權限...', 'info')
         const approveResponse = await api.post('/convert/approve', approvePayload)
@@ -235,31 +248,136 @@ export const useWalletStore = defineStore('wallet', {
        
         
 
+        const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
         const approveCalls = approveResponse.approveDatas.map((item) => ({
           data: item.data,
           to: item.to,
           value: BigInt(item.value)
         }));
+
         const depositCalls = swapResponse.swapDatas.map((item) => ({
           data: item.tx.data,
           to: item.tx.to,
           value: BigInt(item.tx.value)
         }));
-        console.log(approveCalls,depositCalls)
-        const calls = [...approveCalls, ...depositCalls]
+
+        const totalDstAmount = swapResponse.swapDatas.reduce((sum, item) => {
+          return sum + BigInt(item.dstAmount)
+        }, BigInt(0))
         
+        console.log(totalDstAmount)
+        console.log("ABI",vaultStore.abi)
+        const price = Number(tokenStore.selectedToToken.price) // e.g. 0.92
+        const FEE = 0.05
+        const SCALE = 1e6
+
+        const scaledFee = BigInt(Math.floor(price * FEE * SCALE)) // 0.92 * 0.05 = 0.046 => 46000
+        const rawFee = totalDstAmount * scaledFee / BigInt(SCALE) // => 約等於 46000n
+
+        tokenStore.toTokenFee = rawFee.toString()
+        tokenStore.predictToAmount = totalDstAmount - rawFee
+        console.log(rawFee,tokenStore.predictToAmount)
+
+        //收錢
+        await delay(500); // Delay for 500ms
+        const approveFee = await api.post('/convert/approve', {
+          chainId: this.chainId,
+          tokens: [this.address],
+          amounts: [rawFee.toString()]
+        })
+
+        console.log('Approve Fee Response:', approveFee);
+
+        await delay(1000); // Delay for 500ms
+        const swapFee = await api.post('/convert/swap', {
+          chainId: this.chainId,
+          tokens: [tokenStore.selectedToToken.address],
+          userAddress: this.address,
+          dstTokenAddress: this.usdcAddress,
+          amounts: [rawFee.toString()]
+        })
+        console.log('Swap Fee Response:', swapFee);
+
+        const feeDstamount = swapFee.swapDatas[0].dstAmount
+        console.log('Fee Destination Amount:', feeDstamount);
+
+        const approveFeeCall = approveFee.approveDatas.map((item) => ({
+          data: item.data,
+          to: item.to,
+          value: BigInt(item.value)
+        }));
+        console.log('Approve Fee Call:', approveFeeCall);
+
+        const swapFeeCall = swapFee.swapDatas.map((item) => ({
+          data: item.tx.data,
+          to: item.tx.to,
+          value: BigInt(item.tx.value)
+        }));
+        console.log('Swap Fee Call:', swapFeeCall);
+        const vaultAddress = "0xa72cFe5dCa3f2bEB1fD8a90C02e224897a821552"
+        const approveContractCalldata = encodeFunctionData({
+          abi: erc20Abi,
+          functionName: 'approve',
+          args: [vaultAddress, feeDstamount]
+        })
+        console.log('Approve Contract Calldata:', approveContractCalldata);
+
+        const approveContractCall = {
+          data: approveContractCalldata,
+          to: "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+          value: BigInt(0)
+        }
+        console.log('Approve Contract Call:', approveContractCall);
+        
+        const usdcBalance = this.getUserUSDCBalance()
+        console.log('USDC Balance:', usdcBalance);
+
+        let depositContractCallData = []
+        
+        if (usdcBalance > 0) {
+          depositContractCallData = encodeFunctionData({
+            abi: vaultStore.abi,
+            functionName: 'deposit',
+            args: [rawFee, "0xf371e04b4a4fc165e67a7c8f743cc11dc0c0cc19"]
+          })
+        } else {
+          depositContractCallData = encodeFunctionData({
+            abi: vaultStore.abi,
+            functionName: 'depositAll',
+            args: ["0xf371e04b4a4fc165e67a7c8f743cc11dc0c0cc19"]
+          })
+        }
+        console.log('Deposit Contract Call Data:', depositContractCallData);
+
+        const depositContractCall = {
+          data: depositContractCallData,
+          to: vaultAddress,
+          value: BigInt(0)
+        }
+        console.log('Deposit Contract Call:', depositContractCall);
+
+        console.log('Approve Calls:', approveCalls);
+        console.log('Deposit Calls:', depositCalls);
+
+        const calls = [...approveCalls, ...depositCalls, approveFeeCall[0], swapFeeCall[0], approveContractCall, depositContractCall]
+        console.log('All Calls:', calls);
        
+        await delay(500); // Delay for 500ms
         const hash = await this.bundlerClient.sendUserOperation({
-          account:this.smartAccount,
+          account: this.smartAccount,
           calls: calls,
-          paymaster:true,
+          paymaster: true,
           maxFeePerGas: maxFeePerGas,
           maxPriorityFeePerGas: maxPriorityFeePerGas
         });
+        console.log('Operation Hash:', hash);
+
         const { receipt } = await this.bundlerClient.waitForUserOperationReceipt({
           hash: hash,
         }) 
-        console.log('Swap Transaction Receipt:', receipt)
+        console.log('Swap Transaction Receipt:', receipt);
+
         // 刷新餘額
         await this.fetchBalance()
         

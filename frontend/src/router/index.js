@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Website from '../views/Website.vue'
 import HomeView from '../views/HomeView.vue'
 import SwapView from '../views/SwapView.vue'
+import Allowance from '../components/Allowance.vue'
 import { useTokenStore } from '../store/tokens'
 
 const routes = [
@@ -19,6 +20,11 @@ const routes = [
     path: '/swap',
     name: 'swap',
     component: SwapView
+  },
+  {
+    path: '/allowance',
+    name: 'allowance',
+    component: Allowance
   }
 ]
 

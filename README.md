@@ -1,35 +1,35 @@
-# PiggyBank - Web3 智能金庫平台
+# PiggyBank - A smarter way to Swap & Earn
 
-PiggyBank 是一個創新的 Web3 平台，專注於幫助使用者將閒置的加密貨幣資產轉換為生息資產。透過智能合約和 DeFi 協議的整合，使用者可以輕鬆地將各種代幣存入金庫，獲得穩定的利息收益。
+PiggyBank is an innovative Web3 platform that not only helps users convert idle crypto assets into interest-bearing ones, but also consolidates scattered assets into a single token.
+By integrating smart contracts with DeFi protocols, users can easily deposit various tokens into a vault and earn stable interest income.
 
-## 🌟 主要功能
+## 🌟 Main functions
 
 - 💰 多幣種支援：支援 USDC、DAI、USDT 等主流穩定幣
-- 🔄 一鍵兌換：整合 1inch 協議，提供最優兌換路徑
-- 💸 自動生息：透過 Circle API 實現自動化的資金管理
+- 🔄 一鍵兌換：使用 1inch Portal API Swap 指令並透過 Circle API 打包交易，提供最優兌換路徑
+- 💸 自動生息：整合 ERC-4626 及 Yearn 實現自動化的資金管理
 - 📊 即時監控：整合 MultiBaas 提供即時的事件監控
-- 🔒 安全可靠：採用多重簽名和時間鎖定機制
 
-## 🛠 技術棧
+## 🛠 Tech Stack
 
-### 前端
+### Frontend
 - Vue 3 + Vite
 - Tailwind CSS
-- Pinia 狀態管理
+- Pinia status management
 - ethers.js
 
-### 後端
+### Backend
 - Node.js + Express
 - MultiBaas API
 - Circle API
 - 1inch API
 
-### 智能合約
+### SC
 - Solidity
 - Hardhat
 - OpenZeppelin
 
-## 📁 專案結構
+## 📁 Project Structure
 
 ```
 piggy-vault/
@@ -41,7 +41,7 @@ piggy-vault/
     └── tokenList.js  # 支援代幣列表
 ```
 
-## 👥 開發團隊
+## 👥 Development Team
 
 - **A 工程師**: API 整合與後端開發
   - 負責 MultiBaas、Circle、1inch API 整合
@@ -63,15 +63,20 @@ piggy-vault/
   - 整合 Web3 錢包功能
   - 開發響應式設計
 
-## 🚀 快速開始
+- **D 工程師**: 前端開發
+  - 設計與實作使用者介面
+  - 整合 Web3 錢包功能
+  - 開發響應式設計
 
-1. 克隆專案
+## 🚀 Quick Start
+
+1. Clone the projects
 ```bash
 git clone https://github.com/your-org/piggy-vault.git
 cd piggy-vault
 ```
 
-2. 安裝依賴
+2. Install dependencies
 ```bash
 # 安裝前端依賴
 cd frontend
@@ -86,7 +91,7 @@ cd ../hardhat
 npm install
 ```
 
-3. 設定環境變數
+3. Set environment variables
 ```bash
 # 複製環境變數範本
 cp .env.example .env
@@ -94,7 +99,7 @@ cp .env.example .env
 # 編輯 .env 檔案，填入必要的 API 金鑰和配置
 ```
 
-4. 啟動開發環境
+4. Start Development Environment
 ```bash
 # 啟動前端開發伺服器
 cd frontend
