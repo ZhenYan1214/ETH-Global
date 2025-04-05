@@ -8,7 +8,7 @@
     <!-- 頂部導航欄 -->
     <v-app-bar class="nav-bar" elevation="0">
       <div class="logo-container">
-        <img src="https://em-content.zobj.net/source/microsoft-teams/363/pig-face_1f437.png" alt="Piggy Logo" class="piggy-logo" />
+        <img src="@/assets/logo.png" alt="Piggy Logo" class="piggy-logo" />
         <span class="logo-text">Piggy Bank</span>
       </div>
       <v-spacer></v-spacer>
@@ -21,10 +21,7 @@
           <v-icon class="nav-icon">mdi-history</v-icon>
           History
         </v-btn>
-        <v-btn class="nav-btn wallet-btn" elevation="0" @click="showWalletInfo = !showWalletInfo">
-          <v-icon class="nav-icon">mdi-wallet</v-icon>
-          {{ walletStore.isConnected ? walletStore.shortAddress : '連接錢包' }}
-        </v-btn>
+        
       </div>
     </v-app-bar>
 
@@ -35,12 +32,17 @@
           Welcome to Your <span class="highlight">Piggy Vault!</span>
         </h1>
         <p class="sub-title">
-          總資產: <span class="balance-amount">{{ walletStore.isConnected ? walletStore.balance + ' ETH' : '0.00 ETH' }}</span>
+          金庫中的資產: <span class="balance-amount">{{ walletStore.isConnected ? walletStore.balance + ' ETH' : '0.00 ETH' }}</span>
         </p>
         <p class="apy-info">年化收益率: <span class="apy-value">5.5%</span></p>
-        <v-btn class="start-deposit-btn" elevation="0" @click="openPiggyBank">
-          開始存款！！
-        </v-btn>
+        <div class="buttons-container">
+          <v-btn class="start-deposit-btn" elevation="0" @click="openPiggyBank">
+            開始存款！！
+          </v-btn>
+          <v-btn class="start-Withdrawals-btn" elevation="0" @click="openPiggyBank">
+            提款！！
+          </v-btn>
+        </div>
       </div>
       <div class="piggy-section">
         <div class="piggy-container">
@@ -341,6 +343,13 @@ function createParticles() {
   font-weight: 600;
 }
 
+.buttons-container {
+  display: flex;
+  justify-content: center;
+  gap: 40px; /* 按鈕之間的間距 */
+  margin-top: 20px;
+}
+
 .start-deposit-btn {
   width: 320px !important;
   height: 72px !important;
@@ -350,9 +359,27 @@ function createParticles() {
   background: linear-gradient(45deg, #FF6F91, #FF8DA1) !important;
   border-radius: 36px !important;
   transition: all 0.3s ease !important;
+  margin-right: 20px; /* 向左移動 */
 }
 
 .start-deposit-btn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 20px rgba(255, 111, 145, 0.3) !important;
+}
+
+.start-Withdrawals-btn {
+  width: 320px !important;
+  height: 72px !important;
+  font-weight: 700 !important;
+  font-size: 28px !important;
+  color: white !important;
+  background: linear-gradient(45deg, #f4305e, #FF8DA1) !important;
+  border-radius: 36px !important;
+  transition: all 0.3s ease !important;
+  margin-left: 20px; /* 向右移動 */
+}
+
+.start-Withdrawals-btn:hover {
   transform: scale(1.05);
   box-shadow: 0 0 20px rgba(255, 111, 145, 0.3) !important;
 }
@@ -416,6 +443,7 @@ function createParticles() {
   right: 40px !important;
   background: linear-gradient(45deg, #FF6F91, #FF8DA1) !important;
   color: white !important;
+  z-index: 100 !important;
 }
 
 @keyframes bounce {
