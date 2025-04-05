@@ -17,7 +17,7 @@ const webhookRouter = require("./routes/webhook");
 
 // 初始化 Express 應用
 const app = express();
-const PORT = process.env.PORT || 3012;
+const PORT = process.env.PORT;
 
 const server = http.createServer(app); // 用 HTTP server 包 Express
 const wss = new Server({ server });    // 啟動 WebSocket Server

@@ -20,6 +20,10 @@ export const useTokenStore = defineStore('tokens', {
     toAmount: '',
     exchangeRate: null,
     initialized: false,
+    lastFetchTimestamp: 0,
+    tokenCacheExpiry: 60000, // 1 minute cache expiry
+    cachedBalances: null,
+    cachedPrices: {},
     apiBaseUrl: import.meta.env.VITE_API_URL || 'http://localhost:3011'
   }),
   
@@ -196,18 +200,61 @@ export const useTokenStore = defineStore('tokens', {
       }
     },
     
+    // Storage for caching
+    saveToCache(key, data, expiry = this.tokenCacheExpiry) {
+      try {
+        const cacheItem = {
+          data,
+          expiry: Date.now() + expiry
+        };
+        localStorage.setItem(`token_cache_${key}`, JSON.stringify(cacheItem));
+        console.log(`Cached data for ${key}`);
+      } catch (e) {
+        console.warn('Failed to save to cache:', e);
+      }
+    },
+    
+    getFromCache(key) {
+      try {
+        const cached = localStorage.getItem(`token_cache_${key}`);
+        if (!cached) return null;
+        
+        const cacheItem = JSON.parse(cached);
+        if (Date.now() > cacheItem.expiry) {
+          // Cache expired
+          localStorage.removeItem(`token_cache_${key}`);
+          return null;
+        }
+        
+        console.log(`Using cached data for ${key}`);
+        return cacheItem.data;
+      } catch (e) {
+        console.warn('Failed to read from cache:', e);
+        return null;
+      }
+    },
+    
     // Fetch all available tokens
     async fetchAllTokens(chainId = 137) {
       this.isLoadingAllTokens = true;
       const mainStore = useMainStore();
       
       try {
+        // Check cache first
+        const cachedTokens = this.getFromCache(`all_tokens_${chainId}`);
+        if (cachedTokens && Object.keys(cachedTokens).length > 0) {
+          this.allTokens = cachedTokens;
+          this.addPopularTokens();
+          this.isLoadingAllTokens = false;
+          return cachedTokens;
+        }
+        
         const endpoint = `/tokens/list/${chainId}`;
         console.log('All Tokens API endpoint:', endpoint);
         
         const response = await api.get(endpoint);
         
-        if (!response.tokens) {
+        if (!response || !response.tokens) {
           throw new Error('Invalid token list response format');
         }
         
@@ -219,12 +266,32 @@ export const useTokenStore = defineStore('tokens', {
         }
         
         this.allTokens = response.tokens;
+        
+        // Cache the tokens for 1 hour (tokens list changes less frequently)
+        this.saveToCache(`all_tokens_${chainId}`, response.tokens, 3600000);
+        
         this.addPopularTokens();
         
         return response.tokens;
       } catch (error) {
         console.error('Failed to fetch all tokens:', error);
         mainStore.showNotification(`Unable to get token list: ${error.message || 'Unknown error'}`, 'error');
+        
+        // Try to load from local storage even if expired as a last resort
+        try {
+          const key = `token_cache_all_tokens_${chainId}`;
+          const cached = localStorage.getItem(key);
+          if (cached) {
+            const cacheItem = JSON.parse(cached);
+            console.log('Using expired cache as fallback for token list');
+            this.allTokens = cacheItem.data;
+            this.addPopularTokens();
+            return cacheItem.data;
+          }
+        } catch (e) {
+          console.warn('Failed to load expired cache:', e);
+        }
+        
         return {};
       } finally {
         this.isLoadingAllTokens = false;
@@ -281,7 +348,6 @@ export const useTokenStore = defineStore('tokens', {
     // Fetch tokens held by the user
     async fetchTokens(chainId = 137) {
       this.isLoading = true;
-      this.tokens = [];
       this.error = null;
       
       const walletStore = useWalletStore();
@@ -294,13 +360,42 @@ export const useTokenStore = defineStore('tokens', {
         return;
       }
       
+      // Check if we have cached data that's still fresh
+      const cacheKey = `balances_${chainId}_${walletStore.address}`;
+      const cachedData = this.getFromCache(cacheKey);
+      
+      if (cachedData && cachedData.length > 0) {
+        this.tokens = cachedData;
+        console.log('Using cached token balances:', cachedData.length, 'tokens');
+        this.isLoading = false;
+        
+        // Refresh prices for cached tokens in background
+        this.refreshTokenPrices(chainId).catch(e => {
+          console.warn('Background price update failed:', e);
+        });
+        
+        return;
+      }
+      
       try {
-        // Get wallet balances
+        // Get wallet balances with timeout handling
         const balanceEndpoint = `/tokens/balances/${chainId}/${walletStore.address}`;
         console.log('Requesting token balances:', balanceEndpoint);
-        const balanceResponse = await api.get(balanceEndpoint);
         
-        if (!balanceResponse.balances) {
+        // Create a promise that rejects after timeout
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('API request timed out')), 15000);
+        });
+        
+        // Race the actual request against the timeout
+        const balanceResponse = await Promise.race([
+          api.get(balanceEndpoint),
+          timeoutPromise
+        ]);
+        
+        // Check if balanceResponse is valid and has the expected structure
+        if (!balanceResponse || !balanceResponse.balances || !Array.isArray(balanceResponse.balances)) {
+          console.error('Invalid API response format:', balanceResponse);
           throw new Error('Invalid API response format');
         }
         
@@ -320,6 +415,9 @@ export const useTokenStore = defineStore('tokens', {
           return;
         }
         
+        // Save filtered balances for use in case of price API failure
+        this.cachedBalances = filteredTokens;
+        
         // Prepare token addresses for batch price query
         const tokenAddresses = filteredTokens.map(token => token.token.toLowerCase());
         console.log('Preparing batch price query for', tokenAddresses.length, 'tokens');
@@ -334,7 +432,7 @@ export const useTokenStore = defineStore('tokens', {
           const price = priceMap[address] || '0';
           
           const tokenInfo = {
-          address: token.token,
+            address: token.token,
             balance: token.balance,
             price: price
           };
@@ -345,6 +443,9 @@ export const useTokenStore = defineStore('tokens', {
           return tokenInfo;
         });
         
+        // Cache the results
+        this.saveToCache(cacheKey, this.tokens);
+        
         console.log('Setup complete:', this.tokens.length, 'tokens');
         
         // Check if all tokens have prices
@@ -352,12 +453,73 @@ export const useTokenStore = defineStore('tokens', {
         if (tokensWithoutPrice.length > 0) {
           console.warn('The following tokens have no price:', tokensWithoutPrice.map(t => t.address));
         }
+        
+        // Update last fetch timestamp
+        this.lastFetchTimestamp = Date.now();
+        
       } catch (error) {
         console.error('Failed to fetch tokens:', error);
-        this.error = error.response?.data?.message || error.message || 'Failed to fetch tokens';
-        mainStore.showNotification(`Failed to fetch tokens: ${this.error}`, 'error');
+        
+        // Try to use cached balances with fallback prices
+        if (this.cachedBalances && this.cachedBalances.length > 0) {
+          console.log('Using cached balances as fallback');
+          this.tokens = this.cachedBalances.map(token => {
+            const address = token.token.toLowerCase();
+            const cachedPrice = this.cachedPrices[address] || '0';
+            
+            return {
+              address: token.token,
+              balance: token.balance,
+              price: cachedPrice
+            };
+          });
+          
+          mainStore.showNotification('Using cached token data. Some prices may be outdated.', 'warning');
+        } else {
+          // Handle different error scenarios
+          if (error.message === 'API request timed out') {
+            this.error = 'Connection to server timed out. Please try again later.';
+          } else if (error.status === 401 || error.status === 403) {
+            this.error = 'Authentication failed. Please reconnect your wallet.';
+          } else if (error.status >= 500) {
+            this.error = 'Server error. Our team has been notified.';
+          } else {
+            this.error = error.response?.data?.message || error.message || 'Failed to fetch tokens';
+          }
+          
+          mainStore.showNotification(`Failed to fetch tokens: ${this.error}`, 'error');
+        }
       } finally {
         this.isLoading = false;
+      }
+    },
+    
+    // Background refresh of token prices
+    async refreshTokenPrices(chainId = 137) {
+      if (!this.tokens || this.tokens.length === 0) return;
+      
+      try {
+        const tokenAddresses = this.tokens.map(token => token.address.toLowerCase());
+        const priceMap = await this.fetchTokenPrice(tokenAddresses, chainId);
+        
+        // Update prices in place
+        this.tokens.forEach((token, index) => {
+          const address = token.address.toLowerCase();
+          if (priceMap[address]) {
+            this.tokens[index].price = priceMap[address];
+            // Also cache the price
+            this.cachedPrices[address] = priceMap[address];
+          }
+        });
+        
+        // Cache updated tokens
+        const walletStore = useWalletStore();
+        const cacheKey = `balances_${chainId}_${walletStore.address}`;
+        this.saveToCache(cacheKey, this.tokens);
+        
+        console.log('Background price refresh completed');
+      } catch (error) {
+        console.warn('Background price refresh failed:', error);
       }
     },
     
@@ -371,7 +533,7 @@ export const useTokenStore = defineStore('tokens', {
       const addressArray = Array.isArray(addresses) ? addresses : [addresses];
       const normalizedAddresses = addressArray.map(addr => addr.toLowerCase());
       
-      console.log('fetchTokenPrice 被触发，地址:', Array.isArray(addresses) ? addresses : [addresses]);
+      console.log('fetchTokenPrice triggered, addresses:', Array.isArray(addresses) ? addresses : [addresses]);
       
       try {
         // Connect addresses into comma-separated string
@@ -380,8 +542,17 @@ export const useTokenStore = defineStore('tokens', {
         
         console.log('Price API request:', priceEndpoint);
         
-        // Execute API request to get prices
-        const response = await api.get(priceEndpoint);
+        // Execute API request to get prices with timeout handling
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Price API request timed out')), 15000);
+        });
+        
+        // Race the actual request against the timeout
+        const response = await Promise.race([
+          api.get(priceEndpoint),
+          timeoutPromise
+        ]);
+        
         console.log('Price API response:', response);
         
         // If API response is empty or invalid, return empty object
@@ -411,6 +582,14 @@ export const useTokenStore = defineStore('tokens', {
         return result;
       } catch (error) {
         console.error('Error fetching prices:', error);
+        
+        // Show price error notification but don't break the flow
+        const mainStore = useMainStore();
+        if (error.message === 'Price API request timed out') {
+          mainStore.showNotification('Token price update timed out. Prices may be outdated.', 'warning');
+        } else {
+          mainStore.showNotification('Failed to update token prices. Using cached values.', 'warning');
+        }
         
         // Generate default result
         if (Array.isArray(addresses) || normalizedAddresses.length > 1) {
@@ -750,24 +929,65 @@ export const useTokenStore = defineStore('tokens', {
       this.calculateToAmount();
     },
     
-    // Token approval
+    // Token approval with enhanced error handling
     async approveToken() {
       if (!this.canSwap) return;
       
       const mainStore = useMainStore();
       
       try {
-        const payload = {
-          chainId: 137,
-          tokens: [this.selectedFromToken.address],
-          amounts: [this.fromAmount]
-        };
-        
-        const response = await api.post('/convert/approve', payload);
-        return response;
+        // For multi-select mode
+        if (this.selectedFromTokens.length > 0) {
+          const tokens = [];
+          const amounts = [];
+          
+          this.selectedFromTokens.forEach(token => {
+            if (token.amount && token.amount !== '0') {
+              tokens.push(token.address);
+              amounts.push(token.amount);
+            }
+          });
+          
+          if (tokens.length === 0) {
+            throw new Error('No valid token amounts selected');
+          }
+          
+          const payload = {
+            chainId: 137,
+            tokens,
+            amounts
+          };
+          
+          const response = await api.post('/convert/approve', payload);
+          return response;
+        } else {
+          // For single-select mode
+          const payload = {
+            chainId: 137,
+            tokens: [this.selectedFromToken.address],
+            amounts: [this.fromAmount]
+          };
+          
+          const response = await api.post('/convert/approve', payload);
+          return response;
+        }
       } catch (error) {
         console.error('Token approval failed:', error);
-        const errorMsg = error.response?.data?.message || error.message || 'Token approval failed';
+        
+        // Enhanced error handling with more specific messages
+        let errorMsg;
+        if (error.status === 400) {
+          errorMsg = error.response?.data?.message || 'Invalid approval parameters';
+        } else if (error.status === 401 || error.status === 403) {
+          errorMsg = 'Authentication error. Please reconnect your wallet.';
+        } else if (error.status === 429) {
+          errorMsg = 'Too many requests. Please try again later.';
+        } else if (error.status >= 500) {
+          errorMsg = 'Server error. Our team has been notified.';
+        } else {
+          errorMsg = error.response?.data?.message || error.message || 'Token approval failed';
+        }
+        
         mainStore.showNotification(`Approval failed: ${errorMsg}`, 'error');
         throw new Error(errorMsg);
       }
@@ -779,19 +999,62 @@ export const useTokenStore = defineStore('tokens', {
       const mainStore = useMainStore();
       
       try {
-        const payload = {
-          chainId: 137,
-          userAddress: walletStore.address,
-          tokens: [this.selectedFromToken.address],
-          amounts: [this.fromAmount],
-          dstTokenAddress: this.selectedToToken.address
-        };
-        
-        const response = await api.post('/convert/swap', payload);
-        return response;
+        // For multi-select mode
+        if (this.selectedFromTokens.length > 0) {
+          const tokens = [];
+          const amounts = [];
+          
+          this.selectedFromTokens.forEach(token => {
+            if (token.amount && token.amount !== '0') {
+              tokens.push(token.address);
+              amounts.push(token.amount);
+            }
+          });
+          
+          if (tokens.length === 0) {
+            throw new Error('No valid token amounts selected');
+          }
+          
+          const payload = {
+            chainId: 137,
+            userAddress: walletStore.address,
+            tokens,
+            amounts,
+            dstTokenAddress: this.selectedToToken.address
+          };
+          
+          const response = await api.post('/convert/swap', payload);
+          return response;
+        } else {
+          // For single-select mode
+          const payload = {
+            chainId: 137,
+            userAddress: walletStore.address,
+            tokens: [this.selectedFromToken.address],
+            amounts: [this.fromAmount],
+            dstTokenAddress: this.selectedToToken.address
+          };
+          
+          const response = await api.post('/convert/swap', payload);
+          return response;
+        }
       } catch (error) {
         console.error('Swap execution failed:', error);
-        const errorMsg = error.response?.data?.message || error.message || 'Swap execution failed';
+        
+        // Enhanced error handling with more specific messages
+        let errorMsg;
+        if (error.status === 400) {
+          errorMsg = error.response?.data?.message || 'Invalid swap parameters';
+        } else if (error.status === 401 || error.status === 403) {
+          errorMsg = 'Authentication error. Please reconnect your wallet.';
+        } else if (error.status === 429) {
+          errorMsg = 'Too many requests. Please try again later.';
+        } else if (error.status >= 500) {
+          errorMsg = 'Server error. Our team has been notified.';
+        } else {
+          errorMsg = error.response?.data?.message || error.message || 'Swap execution failed';
+        }
+        
         mainStore.showNotification(`Swap failed: ${errorMsg}`, 'error');
         throw new Error(errorMsg);
       }

@@ -37,7 +37,7 @@
           <v-btn class="start-deposit-btn" elevation="0" @click="openPiggyBank">
             Deposit
           </v-btn>
-          <v-btn class="start-Withdrawals-btn" elevation="0" @click="openPiggyBank">
+          <v-btn class="start-Withdrawals-btn" elevation="0" @click="openWithdraw">
             Withdraw
           </v-btn>
         </div>
@@ -111,7 +111,19 @@
     </div>
 
     <History :show="showHistory" @update:show="showHistory = $event" />
-    <TokenList4626 v-model="show4626List" @select="handleTokenSelect" />
+    
+    <!-- 添加 4626list 對話框 -->
+    <TokenList4626 
+      v-model="show4626List"
+      @select="handleTokenSelect"
+    />
+
+    <!-- 添加提款對話框 -->
+    <Withdraw 
+      :visible="showWithdraw" 
+      @update:visible="showWithdraw = $event"
+      @confirm="handleWithdrawConfirm"
+    />
   </div>
 </template>
 
@@ -119,6 +131,7 @@
 import { ref, onMounted, watch, computed } from 'vue'
 import History from '../components/History.vue'
 import TokenList4626 from '../components/4626list.vue'
+import Withdraw from '../components/withdraw.vue'
 import { useWalletStore } from '../store/wallet'
 import { useRouter } from 'vue-router'
 
@@ -128,6 +141,7 @@ const showHistory = ref(false)
 const showWalletInfo = ref(false)
 const showFeedbackModal = ref(false)
 const show4626List = ref(false)
+const showWithdraw = ref(false)
 const vaultBalance = ref('0.00')
 const showThankYou = ref(false)
 const showCommentInput = ref(false)
@@ -170,6 +184,16 @@ watch(() => walletStore.isConnected, async (newValue) => {
 
 function openPiggyBank() {
   show4626List.value = true
+}
+
+function openWithdraw() {
+  showWithdraw.value = true
+}
+
+function handleWithdrawConfirm() {
+  // 處理提款確認後的邏輯
+  console.log('Withdrawal confirmed')
+  showWithdraw.value = false
 }
 
 function handleNavClick(item) {

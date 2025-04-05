@@ -11,7 +11,12 @@
         <v-btn icon variant="text" color="#FF4081" @click="$emit('update:show', false)">
           <v-icon>mdi-arrow-left</v-icon>
         </v-btn>
-        <a href="#" target="_blank" class="explorer-link">
+        <a 
+          v-if="transactionHash" 
+          :href="`https://polygonscan.com/tx/${transactionHash}`" 
+          target="_blank" 
+          class="explorer-link"
+        >
           View on Explorer
           <v-icon size="small">mdi-open-in-new</v-icon>
         </a>
@@ -34,13 +39,25 @@
             </div>
           </div>
         </div>
+        
+        <!-- 交易信息 -->
+        <div v-if="transactionHash" class="transaction-info">
+          <div class="info-row">
+            <span class="info-label">交易哈希:</span>
+            <span class="info-value">{{ shortHash }}</span>
+          </div>
+          <div v-if="blockNumber" class="info-row">
+            <span class="info-label">區塊:</span>
+            <span class="info-value">{{ blockNumber }}</span>
+          </div>
+        </div>
       </div>
     </v-card>
   </v-dialog>
 </template>
 
 <script setup>
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, computed } from 'vue'
 
 const props = defineProps({
   show: Boolean,
@@ -48,8 +65,28 @@ const props = defineProps({
     type: String,
     default: '0',
   },
+  transactionHash: {
+    type: String,
+    default: '',
+  },
+  receipt: {
+    type: Object,
+    default: null,
+  }
 })
 const emit = defineEmits(['update:show'])
+
+// 計算屬性：縮短的交易哈希
+const shortHash = computed(() => {
+  if (!props.transactionHash) return '';
+  const hash = props.transactionHash;
+  return hash.substring(0, 6) + '...' + hash.substring(hash.length - 4);
+});
+
+// 計算屬性：區塊號
+const blockNumber = computed(() => {
+  return props.receipt?.blockNumber || '';
+});
 
 let ws = null
 onMounted(() => {
@@ -59,7 +96,7 @@ onUnmounted(() => {
   if (ws) ws.close()
 })
 function connectWebSocket() {
-  ws = new WebSocket("ws://localhost:3011")
+  ws = new WebSocket("ws://localhost:3012")
   ws.onopen = () => console.log("WebSocket connected")
   ws.onmessage = (event) => {
     try {
@@ -130,6 +167,8 @@ function connectWebSocket() {
   border: 1px solid #FFB6C1;
   border-radius: 8px;
   padding: 6px 12px;
+  margin-bottom: 12px;
+  width: 100%;
 }
 .exchange-item {
   display: flex;
@@ -146,5 +185,31 @@ function connectWebSocket() {
   align-items: center;
   font-weight: 600;
   color: #333;
+}
+
+/* 交易信息區 */
+.transaction-info {
+  width: 100%;
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  font-size: 0.85rem;
+}
+.info-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+.info-label {
+  color: #666;
+}
+.info-value {
+  color: #333;
+  font-family: monospace;
+  background: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 </style>

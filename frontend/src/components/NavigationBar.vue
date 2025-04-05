@@ -9,8 +9,11 @@
     
     <!-- Chain ID and Total Value Display -->
     <div v-if="showWallet" class="wallet-info">
-      <span class="chain-info">Chain ID: {{ chainId }}</span>
-      <span class="value-info">${{ totalValue.toFixed(2) }}</span>
+      <!-- Use network slot if provided -->
+      <slot name="network">
+        <span class="chain-info">Chain ID: {{ chainId }}</span>
+      </slot>
+      <span v-if="showTotalValue" class="value-info">${{ totalValue.toFixed(2) }}</span>
     </div>
     
     <!-- Spacer for flexible layout -->
@@ -91,6 +94,11 @@ const props = defineProps({
   showWallet: {
     type: Boolean,
     default: false
+  },
+  // Whether to show total token value
+  showTotalValue: {
+    type: Boolean,
+    default: true
   },
   // Tokens data for calculating total value
   tokens: {

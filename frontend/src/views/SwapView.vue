@@ -7,8 +7,18 @@
       backRoute="/home"
       :showWallet="true"
       :tokens="tokenStore.tokens"
+      :showTotalValue="false"
       @logout="handleLogout"
-    />
+    >
+      <template v-slot:network>
+        <div class="network-badge d-flex align-center">
+          <v-avatar size="20" class="mr-1">
+            <v-img src="https://cryptologos.cc/logos/polygon-matic-logo.png" alt="Polygon" />
+          </v-avatar>
+          <span class="text-caption font-weight-medium">Polygon</span>
+        </div>
+      </template>
+    </NavigationBar>
 
     <!-- Main Content -->
     <div class="content-container">
@@ -21,66 +31,97 @@
       >
         {{ mainStore.notification.message }}
         <template v-slot:actions>
+          <v-btn v-if="mainStore.notification.color === 'warning' || mainStore.notification.color === 'error'" 
+                 text @click="retryConnection">Retry</v-btn>
           <v-btn text @click="mainStore.clearNotification()">Close</v-btn>
         </template>
       </v-snackbar>
 
-      <!-- Swap Card -->
-      <v-card class="swap-card">
-        <v-card-title class="card-title d-flex align-center">
-          <v-icon class="mr-2">mdi-swap-horizontal</v-icon>
-          <span>Swap</span>
-        </v-card-title>
+      <!-- API Connection Error -->
+      <v-card v-if="connectionError" class="error-card mb-4">
+        <v-card-text class="d-flex align-center">
+          <v-icon color="error" class="mr-2">mdi-alert-circle</v-icon>
+          <span>{{ connectionError }}</span>
+          <v-spacer></v-spacer>
+          <v-btn color="primary" @click="retryConnection">Retry Connection</v-btn>
+        </v-card-text>
+      </v-card>
 
-        <v-card-text class="pa-4">
-          <!-- From Token Section -->
-          <section class="from-section mb-4">
-            <div class="d-flex justify-space-between align-center mb-2">
-              <h3 class="text-subtitle-1 font-weight-medium">Input Token</h3>
-              <v-btn 
-                variant="text" 
-                color="primary" 
-                size="small" 
-                density="compact"
-                @click="showFromTokenList = true"
-                class="select-btn"
-              >
-                {{ tokenStore.selectedFromTokens.length > 0 ? 'Selected ' + tokenStore.selectedFromTokens.length + ' tokens' : 'Select Token' }}
-                <v-icon size="small" class="ml-1">mdi-chevron-down</v-icon>
-              </v-btn>
-                    </div>
+      <!-- Loading Overlay -->
+      <v-overlay
+        :modelValue="isInitialLoading"
+        class="align-center justify-center"
+        persistent
+      >
+        <v-card class="loading-card pa-4">
+          <v-card-text class="text-center">
+            <v-progress-circular
+              indeterminate
+              color="primary"
+              size="64"
+            ></v-progress-circular>
+            <div class="mt-4 text-h6">Connecting to Backend</div>
+            <div class="text-body-2 mt-2">Please wait while we establish connection...</div>
+          </v-card-text>
+        </v-card>
+      </v-overlay>
 
-            <!-- Single Select Mode -->
-            <div v-if="!tokenStore.selectedFromTokens.length">
-              <div class="single-token-container">
-                <simple-token-preview
-                  v-if="tokenStore.selectedFromToken"
-                  :token="tokenStore.selectedFromToken"
-                  :amount="tokenStore.fromAmount"
-                  @amount-change="tokenStore.fromAmount = $event; tokenStore.calculateToAmount()"
-                  @select="showFromTokenList = true"
-                />
-                <v-card v-else class="empty-preview-card pa-4" variant="outlined" @click="showFromTokenList = true">
-                  <div class="text-center cursor-pointer">
-                    <v-icon size="large" class="empty-icon">mdi-wallet-outline</v-icon>
-                    <div class="text-body-1 mt-2">Select a token</div>
-                  </div>
-                </v-card>
+      <div class="swap-wrapper">
+        <!-- Swap Card -->
+        <v-card class="swap-card">
+          <v-card-title class="card-title d-flex align-center">
+            <v-icon class="mr-2">mdi-swap-horizontal</v-icon>
+            <span>Swap</span>
+          </v-card-title>
+
+          <v-card-text class="pa-4">
+            <!-- Horizontal Layout Container -->
+            <div class="horizontal-swap-container">
+              <!-- From Token Section -->
+              <section class="from-section">
+                <div class="d-flex justify-space-between align-center mb-2">
+                  <h3 class="text-subtitle-1 font-weight-medium">Input Token</h3>
+                  <v-btn 
+                    variant="text" 
+                    color="primary" 
+                    size="small" 
+                    density="compact"
+                    @click="showFromTokenList = true"
+                    class="select-btn"
+                  >
+                    {{ tokenStore.selectedFromTokens.length > 0 ? 'Selected ' + tokenStore.selectedFromTokens.length + ' tokens' : 'Select Token' }}
+                    <v-icon size="small" class="ml-1">mdi-chevron-down</v-icon>
+                  </v-btn>
+                </div>
+
+                <!-- Single Select Mode -->
+                <div v-if="!tokenStore.selectedFromTokens.length">
+                  <div class="single-token-container">
+                    <simple-token-preview
+                      v-if="tokenStore.selectedFromToken"
+                      :token="tokenStore.selectedFromToken"
+                      :amount="tokenStore.fromAmount"
+                      @amount-change="tokenStore.fromAmount = $event; tokenStore.calculateToAmount()"
+                      @select="showFromTokenList = true"
+                    />
+                    <v-card v-else class="empty-preview-card pa-4" variant="outlined" @click="showFromTokenList = true">
+                      <div class="text-center cursor-pointer">
+                        <v-icon size="large" class="empty-icon">mdi-wallet-outline</v-icon>
+                        <div class="text-body-1 mt-2">Select a token</div>
+                      </div>
+                    </v-card>
                   </div>
                 </div>
 
                 <!-- Multi-Select Mode -->
                 <div v-else class="token-grid">
-                  <div class="selected-tokens-scroll"
-                    style="max-height: 250px; overflow-y: auto;"
-                  >
+                  <div class="selected-tokens-scroll">
                     <v-row>
                       <v-col
                         v-for="token in tokenStore.selectedFromTokens"
                         :key="token.address"
                         cols="12"
                       >
-                        <!-- 如果 token-card 沒有子元素，可以自閉合 -->
                         <token-card
                           :token="token"
                           @max="setMaxAmount(token.address)"
@@ -99,71 +140,76 @@
                     </span>
                   </div>
                 </div>
-          </section>
+              </section>
 
-            <!-- Swap Arrow -->
-          <div class="swap-arrow-container">
-            <v-btn icon size="small" @click="swapTokens" class="swap-arrow-btn" elevation="1">
-                <v-icon>mdi-swap-vertical</v-icon>
-              </v-btn>
-            </div>
-
-          <!-- To Token Section -->
-          <section class="to-section mb-4">
-            <div class="d-flex justify-space-between align-center mb-2">
-              <h3 class="text-subtitle-1 font-weight-medium">You Will Receive</h3>
-            </div>
-            
-            <div class="single-token-container">
-              <simple-token-preview
-                v-if="tokenStore.selectedToToken"
-                :token="tokenStore.selectedToToken"
-                :amount="tokenStore.toAmount"
-                :showClearButton="false"
-                @select="toTokenDialog = true"
-              />
-              <v-card v-else class="empty-preview-card pa-4" variant="outlined" @click="toTokenDialog = true">
-                <div class="text-center cursor-pointer">
-                  <v-icon size="large" class="empty-icon">mdi-plus-circle-outline</v-icon>
-                  <div class="text-body-1 mt-2">Select a token</div>
-                </div>
-              </v-card>
-            </div>
-          </section>
-
-          <!-- Wallet Connection -->
-          <div v-if="walletStore.isConnected" class="wallet-info mb-3">
-            <v-icon size="small" class="mr-1">mdi-wallet</v-icon>
-            <span class="text-caption">{{ walletStore.formattedAddress }}</span>
-          </div>
-
-          <!-- Swap Button -->
-          <div class="swap-btn-container mt-3">
-            <div v-if="isSwapping" class="swap-progress mb-2">
-              <div class="d-flex justify-space-between mb-1">
-                <span class="text-caption">{{ swapStep === 'approving' ? 'Approving...' : 'Swapping...' }}</span>
-                <span class="text-caption">{{ swapStep === 'approving' ? '1/2' : '2/2' }}</span>
+              <!-- Swap Arrow -->
+              <div class="swap-arrow-container">
+                <v-btn icon size="small" @click="swapTokens" class="swap-arrow-btn" elevation="1">
+                  <v-icon>mdi-arrow-right</v-icon>
+                </v-btn>
               </div>
-              <v-progress-linear indeterminate rounded color="primary" height="4"></v-progress-linear>
+
+              <!-- To Token Section -->
+              <section class="to-section">
+                <div class="d-flex justify-space-between align-center mb-2">
+                  <h3 class="text-subtitle-1 font-weight-medium">You Will Receive</h3>
+                </div>
+                
+                <div class="single-token-container">
+                  <simple-token-preview
+                    v-if="tokenStore.selectedToToken"
+                    :token="tokenStore.selectedToToken"
+                    :amount="tokenStore.toAmount"
+                    :showClearButton="false"
+                    @select="toTokenDialog = true"
+                  />
+                  <v-card v-else class="empty-preview-card pa-4" variant="outlined" @click="toTokenDialog = true">
+                    <div class="text-center cursor-pointer">
+                      <v-icon size="large" class="empty-icon">mdi-plus-circle-outline</v-icon>
+                      <div class="text-body-1 mt-2">Select a token</div>
+                    </div>
+                  </v-card>
+                </div>
+              </section>
             </div>
-            
-          <v-btn
-            block
-              class="swap-btn"
-            size="large"
-              :disabled="!walletStore.isConnected ? false : !canSwap"
-              :loading="isSwapping"
-              @click="walletStore.isConnected ? performSwap() : router.push('/')"
-          >
-              {{ swapButtonText }}
-          </v-btn>
-            
-            <div v-if="swapError" class="error-message mt-2 text-caption text-center">
-              {{ swapError }}
+
+            <!-- Wallet Connection & Swap Button -->
+            <div class="action-container">
+              <!-- Wallet Connection -->
+              <div v-if="walletStore.isConnected" class="wallet-info mb-3">
+                <v-icon size="small" class="mr-1">mdi-wallet</v-icon>
+                <span class="text-caption">{{ walletStore.formattedAddress }}</span>
+              </div>
+
+              <!-- Swap Button -->
+              <div class="swap-btn-container">
+                <div v-if="isSwapping" class="swap-progress mb-2">
+                  <div class="d-flex justify-space-between mb-1">
+                    <span class="text-caption">{{ swapStep === 'approving' ? 'Approving...' : 'Swapping...' }}</span>
+                    <span class="text-caption">{{ swapStep === 'approving' ? '1/2' : '2/2' }}</span>
+                  </div>
+                  <v-progress-linear indeterminate rounded color="primary" height="4"></v-progress-linear>
+                </div>
+                
+                <v-btn
+                  block
+                  class="swap-btn"
+                  size="large"
+                  :disabled="!walletStore.isConnected ? false : !canSwap"
+                  :loading="isSwapping"
+                  @click="walletStore.isConnected ? performSwap() : router.push('/')"
+                >
+                  {{ swapButtonText }}
+                </v-btn>
+                
+                <div v-if="swapError" class="error-message mt-2 text-caption text-center">
+                  {{ swapError }}
+                </div>
+              </div>
             </div>
-          </div>
-        </v-card-text>
-      </v-card>
+          </v-card-text>
+        </v-card>
+      </div>
     </div>
 
     <!-- From Token Selection Dialog -->
@@ -205,7 +251,12 @@
 
         <v-card-text v-else-if="filteredFromTokens.length === 0" class="text-center pa-4">
           <v-icon size="large" color="grey-lighten-1">mdi-alert-circle-outline</v-icon>
-          <div class="mt-2">No matching tokens</div>
+          <div class="mt-2">
+            {{ fromTokenSearchText ? 'No matching tokens' : 'No tokens with balance found' }}
+          </div>
+          <div v-if="!fromTokenSearchText" class="text-caption text-grey mt-2">
+            You need to have tokens in your wallet to perform a swap
+          </div>
         </v-card-text>
 
         <v-card-text
@@ -214,10 +265,6 @@
         >
           <div
             class="token-scroll-wrapper"
-            :style="{
-              maxHeight: '400px',
-              overflowY: 'auto'
-            }"
           >
             <v-list class="py-0">
               <v-list-item
@@ -259,7 +306,6 @@
             </v-list>
           </div>
         </v-card-text>
-
       </v-card>
     </v-dialog>
 
@@ -313,7 +359,7 @@
                   <div class="token-selection-left">
                     <v-avatar size="40" class="token-avatar">
                       <v-img :src="token.logoURI || 'https://via.placeholder.com/40'" @error="handleImageError" />
-                </v-avatar>
+                    </v-avatar>
                     <div class="token-selection-info">
                       <div class="token-selection-name">
                         <span class="font-weight-medium">{{ token.symbol || '???' }}</span>
@@ -351,10 +397,8 @@ const walletStore = useWalletStore()
 const mainStore = useMainStore()
 const router = useRouter()
 
-// Navigation items for the navigation bar
-const navigationItems = [
-  { icon: 'mdi-history', title: 'History', route: '/history' }
-]
+// Navigation items for the navigation bar - removed History
+const navigationItems = []
 
 // Loading state and UI controls
 const showFromTokenList = ref(false)
@@ -364,6 +408,8 @@ const swapStep = ref('initial') // 'initial', 'approving', 'swapping', 'complete
 const swapError = ref('')
 const tokenSearchText = ref('')
 const fromTokenSearchText = ref('')
+const isInitialLoading = ref(true)
+const connectionError = ref(null)
 
 // Computed properties for UI
 const canSwap = computed(() => {
@@ -505,16 +551,53 @@ async function performSwap() {
   try {
     mainStore.showNotification('Preparing to swap tokens...', 'info')
     
-    // Use wallet store's sendSwapTransaction method to execute swap
-    const result = await walletStore.sendSwapTransaction({
+    // First step: Approve tokens (if needed)
+    console.log('Requesting token approval...')
+    const approvalResult = await tokenStore.approveToken()
+    
+    if (!approvalResult || !approvalResult.approveDatas || approvalResult.approveDatas.length === 0) {
+      throw new Error('Failed to get approval data from server')
+    }
+    
+    // Process approval transaction data
+    const approvalTxData = approvalResult.approveDatas[0]
+    console.log('Approval data received:', approvalTxData)
+    
+    // Execute approval transaction
+    const approvalTx = await walletStore.sendSwapTransaction({
+      to: approvalTxData.to,
+      data: approvalTxData.data,
+      value: approvalTxData.value || '0x0'
+    })
+    
+    if (!approvalTx || !approvalTx.success) {
+      throw new Error(approvalTx?.error || 'Approval transaction failed')
+    }
+    
+    console.log('Approval transaction successful:', approvalTx)
+    mainStore.showNotification('Token approval confirmed! Preparing swap...', 'success')
+    
+    // Second step: Execute the swap
+    swapStep.value = 'swapping'
+    console.log('Requesting swap data...')
+    const swapResult = await tokenStore.executeSwap()
+    
+    if (!swapResult || !swapResult.swapDatas || swapResult.swapDatas.length === 0) {
+      throw new Error('Failed to get swap data from server')
+    }
+    
+    // Process swap transaction data
+    const swapTxData = swapResult.swapDatas[0].tx
+    console.log('Swap data received:', swapTxData)
+    
+    // Execute swap transaction with sendSwapTransaction method
+    const swapTx = await walletStore.sendSwapTransaction({
       paymaster: true
     })
     
-    if (!result.success) {
-      throw new Error(result.error || 'Swap failed')
+    if (!swapTx || !swapTx.success) {
+      throw new Error(swapTx?.error || 'Swap transaction failed')
     }
-    
-    swapStep.value = 'swapping'
     
     // Swap successful
     swapStep.value = 'complete'
@@ -522,17 +605,41 @@ async function performSwap() {
     
     // Refresh token balances
     await tokenStore.fetchTokens()
+    
+    // Reset form if successful
+    setTimeout(() => {
+      if (tokenStore.selectedFromTokens.length > 0) {
+        tokenStore.clearSelectedFromTokens()
+      } else {
+        tokenStore.reset()
+      }
+    }, 3000)
   } catch (error) {
     console.error('Swap failed:', error)
     swapStep.value = 'error'
-    swapError.value = error.message || 'Swap failed'
+    
+    // Generate user-friendly error message
+    let errorMessage = error.message || 'Unknown error occurred'
+    
+    // Handle specific error cases
+    if (errorMessage.includes('rejected') || errorMessage.includes('denied') || errorMessage.includes('cancelled')) {
+      errorMessage = 'Transaction was rejected by user'
+    } else if (errorMessage.includes('insufficient funds')) {
+      errorMessage = 'Insufficient funds for transaction'
+    } else if (errorMessage.includes('gas')) {
+      errorMessage = 'Gas estimation failed. The transaction might fail.'
+    } else if (errorMessage.includes('nonce')) {
+      errorMessage = 'Transaction nonce error. Please try again.'
+    }
+    
+    swapError.value = errorMessage
     
     // Show error message
-    mainStore.showNotification(swapError.value, 'error')
+    mainStore.showNotification(`Swap failed: ${errorMessage}`, 'error')
   } finally {
-    isSwapping.value = false
     setTimeout(() => {
       if (swapStep.value === 'complete' || swapStep.value === 'error') {
+        isSwapping.value = false
         swapStep.value = 'initial'
       }
     }, 3000)
@@ -545,9 +652,10 @@ onMounted(async () => {
   if (!walletStore.isConnected) {
     mainStore.showNotification('Please connect your wallet first', 'warning')
     router.push('/')
+    isInitialLoading.value = false
   } else {
     try {
-      // Ensure token list is initialized
+      // Ensure token store is initialized
       if (!tokenStore.initialized) {
         console.log('SwapView: Token store not initialized yet, initializing now...')
         await tokenStore.initialize()
@@ -563,12 +671,44 @@ onMounted(async () => {
         console.log('SwapView: Updating selected token prices')
         await tokenStore.updateSwapTokenPrices()
       }
+      
+      // Clear any connection errors on successful load
+      connectionError.value = null
     } catch (error) {
       console.error('Failed to fetch tokens on mount:', error)
-      mainStore.showNotification(`Failed to load tokens: ${error.message}`, 'error')
+      connectionError.value = error.message || 'Connection to backend failed. Please try again.'
+      mainStore.showNotification(`Failed to load tokens: ${error.message || 'Connection to API failed'}`, 'error')
+      
+      // Add retry button to notification
+      setTimeout(() => {
+        mainStore.showNotification('Unable to connect to backend. Please check your connection and try again.', 'warning', 0)
+      }, 3000)
+    } finally {
+      isInitialLoading.value = false
     }
   }
 })
+
+// Add function to retry API connection
+function retryConnection() {
+  mainStore.clearNotification()
+  mainStore.showNotification('Reconnecting to backend...', 'info')
+  isInitialLoading.value = true
+  
+  // Re-initialize token store and fetch tokens
+  tokenStore.initialize().then(() => {
+    return tokenStore.fetchTokens()
+  }).then(() => {
+    mainStore.showNotification('Connection restored successfully!', 'success')
+    connectionError.value = null
+  }).catch(error => {
+    console.error('Retry connection failed:', error)
+    connectionError.value = error.message || 'Connection to backend failed. Please try again.'
+    mainStore.showNotification(`Connection failed: ${error.message || 'Unknown error'}`, 'error')
+  }).finally(() => {
+    isInitialLoading.value = false
+  })
+}
 
 function getTokenSymbol(address) {
   if (!address) return '???';
@@ -639,15 +779,23 @@ function formatAddress(address) {
 
 // New computed properties and functions
 const filteredFromTokens = computed(() => {
+  // Get all tokens and filter out those with zero balance
+  const tokensWithBalance = tokenStore.formattedTokens.filter(token => {
+    // Check if token has a non-zero balance
+    const balance = token.balance || '0';
+    const numBalance = parseFloat(balance);
+    return numBalance > 0;
+  });
+  
   if (!fromTokenSearchText.value) {
-    // If no search term, return user tokens and popular tokens
-    return tokenStore.formattedTokens;
+    // If no search term, return tokens with balance
+    return tokensWithBalance;
   }
   
   const searchText = fromTokenSearchText.value.toLowerCase();
   
-  // First search in user tokens
-  const filteredUserTokens = tokenStore.formattedTokens.filter(token => {
+  // Filter tokens with balance based on search criteria
+  return tokensWithBalance.filter(token => {
     const symbol = getTokenSymbol(token.address).toLowerCase();
     const name = getTokenName(token.address).toLowerCase();
     const address = token.address.toLowerCase();
@@ -656,8 +804,6 @@ const filteredFromTokens = computed(() => {
            name.includes(searchText) || 
            address.includes(searchText);
   });
-  
-  return filteredUserTokens;
 })
 
 function updateFromTokenAmount(address, amount) {
@@ -791,16 +937,22 @@ function getDisplayBalance(token) {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  padding: 1.5rem;
+  padding: 2rem 1rem;
   min-height: calc(100vh - 64px);
+}
+
+.swap-wrapper {
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
 }
 
 .swap-card {
   width: 100%;
-  max-width: 480px;
   border-radius: 20px;
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05);
   overflow: hidden;
+  margin-bottom: 1rem;
 }
 
 .card-title {
@@ -812,8 +964,20 @@ function getDisplayBalance(token) {
   letter-spacing: 0.5px;
 }
 
+.horizontal-swap-container {
+  display: flex;
+  flex-direction: row;
+  align-items: stretch;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
 .from-section, .to-section {
+  flex: 1;
   position: relative;
+  padding: 0.75rem;
+  background-color: rgba(var(--v-theme-primary), 0.02);
+  border-radius: 16px;
 }
 
 .select-btn {
@@ -821,69 +985,17 @@ function getDisplayBalance(token) {
   font-weight: 500;
 }
 
-.token-select-btn {
-  height: 36px;
-  min-width: 100px;
-  background-color: rgba(255, 182, 193, 0.1);
-  border: 1px solid rgba(255, 153, 153, 0.2);
-  border-radius: 20px;
-  font-weight: 500;
-}
-
-.empty-card {
-  min-height: 120px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.token-card {
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.token-grid-card {
-  border-radius: 8px;
-  overflow: hidden;
-  transition: all 0.2s ease;
-}
-
-.token-grid-card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.token-price-bar {
-  background-color: rgba(0, 0, 0, 0.02);
-  border-top: 1px solid rgba(0, 0, 0, 0.05);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.token-action-buttons {
-  position: absolute;
-  right: 5px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-}
-
-.token-max-btn {
-  font-size: 10px;
-  margin-right: 4px;
-}
-
-.token-remove-btn {
-  min-width: 20px;
-  height: 20px;
+.action-container {
+  background-color: rgba(var(--v-theme-primary), 0.03);
+  border-radius: 16px;
+  padding: 1.25rem;
+  margin-top: 1rem;
 }
 
 .swap-arrow-container {
   display: flex;
   justify-content: center;
-  margin: 1rem 0;
-  position: relative;
+  align-items: center;
 }
 
 .swap-arrow-btn {
@@ -895,13 +1007,6 @@ function getDisplayBalance(token) {
 
 .swap-arrow-btn:hover {
   transform: scale(1.1);
-}
-
-.info-box {
-  background-color: rgba(255, 182, 193, 0.1);
-  border-radius: 8px;
-  padding: 8px 12px;
-  border: 1px solid rgba(255, 153, 153, 0.1);
 }
 
 .swap-btn {
@@ -933,27 +1038,19 @@ function getDisplayBalance(token) {
   border-color: rgba(255, 153, 153, 0.3) !important;
 }
 
-.amount-input :deep(.v-field__outline) {
-  --v-field-border-width: 1px !important;
-}
-
-.amount-field {
-  font-size: 1.1rem;
-}
-
-.token-list {
-  max-height: 400px;
-  overflow-y: auto;
-  border-radius: 0;
-}
-
-.token-symbol {
-  font-weight: 600;
-}
-
 .token-dialog {
   border-radius: 16px;
   overflow: hidden;
+}
+
+.token-scroll-wrapper {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.selected-tokens-scroll {
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .total-value-container {
@@ -965,62 +1062,45 @@ function getDisplayBalance(token) {
   border: 1px dashed rgba(var(--v-theme-primary), 0.2);
 }
 
-.price-chip {
-  font-size: 0.75rem;
-}
-
-.max-btn {
-  position: absolute;
-  right: 0;
-  top: 4px;
-  font-size: 0.65rem;
-  font-weight: bold;
-}
-
-.max-btn-small {
-  position: absolute;
-  right: 35px;
-  top: 2px;
-  font-size: 0.65rem;
-  font-weight: bold;
-}
-
-.swap-btn-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-}
-
-.swap-progress {
-  width: 100%;
-  margin-bottom: 1rem;
-}
-
-.error-message {
-  color: #ff5252;
-  font-size: 0.8rem;
-  margin-top: 0.75rem;
-}
-
-.empty-token-placeholder {
-  opacity: 0.7;
-}
-
-@media (max-width: 600px) {
-  .content-container {
-    padding: 1rem 0.75rem;
-  }
-  
-  .swap-card {
-    border-radius: 16px;
-  }
-}
-
-.token-grid {
-  padding: 8px;
-  background-color: rgba(var(--v-theme-primary), 0.02);
+.single-token-container {
   border-radius: 12px;
+}
+
+.empty-preview-card {
+  border-radius: 12px;
+  border: 1px dashed rgba(var(--v-theme-primary), 0.2);
+  min-height: 100px;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.empty-preview-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  background-color: rgba(var(--v-theme-primary), 0.03);
+}
+
+.empty-icon {
+  color: rgba(var(--v-theme-primary), 0.6);
+  margin-bottom: 8px;
+}
+
+.cursor-pointer {
+  cursor: pointer;
+}
+
+.error-card {
+  background-color: #FFEBEE;
+  border-left: 4px solid #F44336;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  max-width: 800px;
+  margin: 0 auto 1rem auto;
+}
+
+.loading-card {
+  border-radius: 12px;
+  width: 300px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
 }
 
 .token-selection-card {
@@ -1073,37 +1153,55 @@ function getDisplayBalance(token) {
   font-weight: 500;
 }
 
-.selected-token {
-  background-color: rgba(var(--v-theme-primary), 0.08) !important;
-  border-color: rgba(var(--v-theme-primary), 0.3) !important;
-  box-shadow: 0 2px 8px rgba(var(--v-theme-primary), 0.15) !important;
+.network-badge {
+  background-color: rgba(130, 71, 229, 0.1);
+  border-radius: 16px;
+  padding: 4px 8px;
+  border: 1px solid rgba(130, 71, 229, 0.2);
 }
 
-.single-token-container {
-  background-color: rgba(var(--v-theme-primary), 0.02);
-  border-radius: 12px;
-  padding: 8px;
+/* Responsive styles */
+@media (max-width: 768px) {
+  .horizontal-swap-container {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .swap-arrow-container {
+    transform: rotate(90deg);
+    margin: 10px 0;
+  }
+  
+  .swap-wrapper {
+    max-width: 480px;
+  }
+  
+  .error-card {
+    max-width: 480px;
+  }
 }
 
-.empty-preview-card {
-  border-radius: 12px;
-  border: 1px dashed rgba(var(--v-theme-primary), 0.2);
-  min-height: 100px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+@media (max-width: 600px) {
+  .content-container {
+    padding: 1rem 0.75rem;
+  }
+  
+  .from-section, .to-section {
+    padding: 0.5rem;
+  }
+
+  .action-container {
+    padding: 1rem;
+  }
 }
 
-.empty-preview-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  background-color: rgba(var(--v-theme-primary), 0.03);
-}
-
-.empty-icon {
-  color: rgba(var(--v-theme-primary), 0.6);
-  margin-bottom: 8px;
-}
-
-.cursor-pointer {
-  cursor: pointer;
+@media (max-height: 700px) {
+  .content-container {
+    padding-top: 1rem;
+  }
+  
+  .selected-tokens-scroll {
+    max-height: 200px;
+  }
 }
 </style> 

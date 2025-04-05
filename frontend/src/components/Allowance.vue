@@ -2,41 +2,41 @@
   <div>
     <v-dialog v-model="dialogModel" max-width="600" scrollable content-class="allowance-dialog-wrapper">
       <v-card class="allowance-dialog rounded-xl">
-        <!-- 頂部導航欄 -->
+        <!-- Top Toolbar -->
         <v-toolbar color="primary" density="compact" class="rounded-t-xl">
-          <v-toolbar-title class="text-white font-weight-bold">存入金庫預覽</v-toolbar-title>
+          <v-toolbar-title class="text-white font-weight-bold">Deposit Preview</v-toolbar-title>
           <v-spacer></v-spacer>
           <v-btn icon variant="text" color="white" @click="handleClose">
             <v-icon>mdi-close</v-icon>
           </v-btn>
         </v-toolbar>
 
-        <!-- 加載、錯誤和內容切換 -->
+        <!-- Loading, Error and Content States -->
         <div v-if="isLoading" class="loading-container pa-8 d-flex flex-column align-center justify-center">
           <v-progress-circular indeterminate color="primary" size="64" width="6"></v-progress-circular>
-          <div class="mt-4 text-body-1 text-center">正在獲取最新數據...</div>
+          <div class="mt-4 text-body-1 text-center">Fetching latest data...</div>
         </div>
         
         <div v-else-if="error" class="error-container pa-6 d-flex flex-column align-center justify-center">
           <v-avatar color="error" class="error-icon mb-4">
             <v-icon size="36" color="white">mdi-alert-circle</v-icon>
           </v-avatar>
-          <h3 class="text-h6 text-center mb-2">處理請求時發生錯誤</h3>
+          <h3 class="text-h6 text-center mb-2">Error Processing Request</h3>
           <p class="text-body-2 text-center mb-4">{{ error }}</p>
-          <v-btn color="primary" prepend-icon="mdi-refresh" variant="elevated" class="px-6" @click="retry">重試</v-btn>
+          <v-btn color="primary" prepend-icon="mdi-refresh" variant="elevated" class="px-6" @click="retry">Retry</v-btn>
         </div>
           
         <template v-else>
-          <!-- 主要內容 -->
+          <!-- Main Content -->
           <v-card-text class="pa-0">
-            <!-- 代幣交換摘要卡片 -->
+            <!-- Token Exchange Summary Card -->
             <div class="summary-card mx-4 mt-4 mb-2 pa-4">
-              <div class="text-subtitle-1 font-weight-medium mb-2">交易摘要</div>
+              <div class="text-subtitle-1 font-weight-medium mb-2">Transaction Summary</div>
               
-              <!-- 多代幣輸入展示 -->
+              <!-- Multiple Token Input Display -->
               <div v-if="multipleTokens" class="multi-tokens-summary">
                 <div class="d-flex justify-space-between align-center mb-2">
-                  <div class="text-body-2 text-medium-emphasis">您選擇的代幣 ({{ fromTokens.length }})</div>
+                  <div class="text-body-2 text-medium-emphasis">Selected Tokens ({{ fromTokens.length }})</div>
                   <div class="text-body-2 font-weight-medium">${{ totalFromValue }}</div>
                 </div>
                 
@@ -59,7 +59,7 @@
                 </div>
               </div>
               
-              <!-- 單代幣輸入展示 -->
+              <!-- Single Token Input Display -->
               <div v-else class="single-token-summary d-flex justify-space-between align-center mb-3">
                 <div class="d-flex align-center">
                   <v-avatar size="28" class="mr-2">
@@ -70,7 +70,7 @@
                 <span class="text-body-2 font-weight-medium">${{ fromUsdValue }}</span>
               </div>
               
-              <!-- 轉換指示器 -->
+              <!-- Conversion Indicator -->
               <div class="conversion-line py-2 d-flex align-center">
                 <v-divider></v-divider>
                 <v-avatar class="mx-2" color="primary" size="28">
@@ -79,7 +79,7 @@
                 <v-divider></v-divider>
               </div>
               
-              <!-- 輸出代幣摘要 -->
+              <!-- Output Token Summary -->
               <div class="output-summary d-flex justify-space-between align-center mt-3">
                 <div class="d-flex align-center">
                   <v-avatar size="28" class="mr-2">
@@ -100,14 +100,14 @@
               </div>
             </div>
             
-            <!-- 交易詳情信息 -->
+            <!-- Transaction Details -->
             <div class="details-card mx-4 mt-3 mb-4 pa-4">
-              <div class="text-subtitle-1 font-weight-medium mb-3">詳細信息</div>
+              <div class="text-subtitle-1 font-weight-medium mb-3">Details</div>
               <div class="details-grid">
                 <div class="detail-row py-2">
                   <div class="detail-label">
                     <v-icon size="small" color="primary" class="mr-1">mdi-cash-multiple</v-icon>
-                    <span>手續費</span>
+                    <span>Fee</span>
                   </div>
                   <div class="detail-value free-tag">Deducted from interest</div>
                 </div>
@@ -115,7 +115,7 @@
                 <div class="detail-row py-2">
                   <div class="detail-label">
                     <v-icon size="small" color="primary" class="mr-1">mdi-gas-station</v-icon>
-                    <span>網絡費用 (估計)</span>
+                    <span>Network Fee (Est.)</span>
                   </div>
                   <div class="detail-value sponsored-tag">Sponsored</div>
                 </div>
@@ -123,15 +123,15 @@
                 <div class="detail-row py-2">
                   <div class="detail-label">
                     <v-icon size="small" color="primary" class="mr-1">mdi-clock-outline</v-icon>
-                    <span>交易過期時間</span>
+                    <span>Expiration Time</span>
                   </div>
-                  <div class="detail-value">{{ expirationTime }} 分鐘</div>
+                  <div class="detail-value">{{ expirationTime }} minutes</div>
                 </div>
               </div>
             </div>
           </v-card-text>
 
-          <!-- 確認按鈕區域 -->
+          <!-- Confirm Button Area -->
           <v-card-actions class="pa-4 pt-0">
             <v-btn
               block
@@ -141,14 +141,14 @@
               :disabled="isConfirming"
               @click="handleConfirmDeposit"
             >
-              <span class="button-text">確認存入金庫</span>
+              <span class="button-text">Confirm Deposit</span>
             </v-btn>
           </v-card-actions>
           
-          <!-- 安全提示 -->
+          <!-- Security Note -->
           <div class="security-note pa-4 pt-0 d-flex align-center">
             <v-icon size="small" color="primary" class="mr-2">mdi-shield-check</v-icon>
-            <span class="text-caption">所有交易均經過安全驗證並保障資金安全</span>
+            <span class="text-caption">All transactions are verified and funds are secured</span>
           </div>
         </template>
       </v-card>
@@ -190,7 +190,7 @@ const vaultStore = useVaultStore()
 const walletStore = useWalletStore()
 const mainStore = useMainStore()
 
-// 本地狀態
+// Local state
 const isLoading = ref(false)
 const isConfirming = ref(false)
 const error = ref(null)
@@ -198,10 +198,10 @@ const depositPreview = ref(null)
 const showTransactionStatus = ref(false)
 const showFinish = ref(false)
 const transactionStatus = ref('pending')
-const transactionMessage = ref('交易處理中，請稍候...')
+const transactionMessage = ref('Processing transaction...')
 const transactionHash = ref('')
 
-// 代幣資訊
+// Token info
 const toToken = ref({
   symbol: 'USDC',
   icon: 'https://cryptologos.cc/logos/usd-coin-usdc-logo.png',
@@ -209,18 +209,18 @@ const toToken = ref({
   price: 1
 })
 
-// 計算屬性
+// Calculated properties
 const dialogModel = computed({
   get: () => props.modelValue,
   set: (value) => emit('update:modelValue', value)
 })
 
-// 判斷是否為多代幣輸入
+// Determine if multiple tokens are selected
 const multipleTokens = computed(() => {
   return tokenStore.selectedFromTokens && tokenStore.selectedFromTokens.length > 1
 })
 
-// 從代幣列表 (單個或多個)
+// From token list (multiple or single)
 const fromTokens = computed(() => {
   if (multipleTokens.value) {
     return tokenStore.selectedFromTokens.map(token => {
@@ -239,7 +239,7 @@ const fromTokens = computed(() => {
   }
 })
 
-// 單一輸入代幣
+// Single input token
 const fromToken = computed(() => {
   if (multipleTokens.value) {
     return null
@@ -259,7 +259,7 @@ const fromToken = computed(() => {
   }
 })
 
-// 總輸入價值 (USD)
+// Total input value (USD)
 const totalFromValue = computed(() => {
   if (multipleTokens.value) {
     return formatUsdValue(fromTokens.value.reduce((sum, token) => {
@@ -271,7 +271,7 @@ const totalFromValue = computed(() => {
   return '0.00'
 })
 
-// 從預覽數據中取值
+// Get value from preview data
 const fromUsdValue = computed(() => {
   if (!depositPreview.value) return '0.00'
   return formatUsdValue(depositPreview.value.fromUsdValue)
@@ -298,7 +298,7 @@ const exchangeRate = computed(() => {
 })
 
 const depositFee = computed(() => {
-  return 'FREE'  // 可以根據後端返回數據調整
+  return 'FREE'  // Can be adjusted based on backend return data
 })
 
 const networkCost = computed(() => {
@@ -316,90 +316,81 @@ const expirationTime = computed(() => {
   return depositPreview.value.expirationTime
 })
 
-// 監聽對話框顯示狀態
+// Watch dialog box display state
 watch(() => props.modelValue, async (newValue) => {
   if (newValue) {
-    // 获取數據
+    // Get data
     fetchDepositPreview()
   }
 })
 
-// 方法
+// Methods
 async function fetchDepositPreview() {
   isLoading.value = true
   error.value = null
   
-  console.log('Allowance: 開始獲取存款預覽');
-  console.log('多選模式?', multipleTokens.value);
+  console.log('Allowance: Start fetching deposit preview')
+  console.log('Multiple tokens mode?', multipleTokens.value)
   
   if (multipleTokens.value) {
-    console.log('已選擇的多個代幣:', tokenStore.selectedFromTokens);
+    console.log('Selected multiple tokens:', tokenStore.selectedFromTokens)
   } else {
-    console.log('已選擇的單個代幣:', tokenStore.selectedFromToken);
+    console.log('Selected single token:', tokenStore.selectedFromToken)
   }
   
-  // 同步代幣選擇狀態，確保單選和多選模式一致
-  const syncResult = tokenStore.syncTokenSelectionState();
-  console.log('代幣選擇狀態同步結果:', syncResult);
+  const syncResult = tokenStore.syncTokenSelectionState()
+  console.log('Token selection sync result:', syncResult)
   
   try {
-    // 檢查錢包連接狀態
     if (!walletStore.isConnected) {
-      throw new Error('請先連接錢包')
+      throw new Error('Please connect wallet first')
     }
     
-    // 準備選定的代幣數據
-    let tokens = [];
+    let tokens = []
     
     if (multipleTokens.value) {
-      // 多選模式
       tokens = tokenStore.selectedFromTokens
         .filter(t => t && t.amount && parseFloat(t.amount) > 0)
         .map(t => ({
           address: t.address,
           amount: t.amount
-        }));
+        }))
     } else if (tokenStore.selectedFromToken) {
-      // 單選模式
       tokens = [{
         address: tokenStore.selectedFromToken.address,
         amount: tokenStore.fromAmount
-      }];
+      }]
     }
     
-    console.log('準備發送到預覽的代幣:', tokens);
+    console.log('Tokens prepared for preview:', tokens)
     
-    // 檢查是否有選擇代幣
     if (tokens.length === 0 || !tokens[0]?.address) {
-      throw new Error('沒有選擇代幣或金額為0，請返回並選擇代幣')
+      throw new Error('No tokens selected or amount is 0')
     }
     
-    // 調用 vault store 的預覽存款方法
     try {
-      console.log('調用 vaultStore.previewDeposit');
+      console.log('Calling vaultStore.previewDeposit')
       const preview = await vaultStore.previewDeposit(tokens)
       if (!preview) {
-        throw new Error('獲取存款預覽失敗')
+        throw new Error('Failed to get deposit preview')
       }
       
-      console.log('獲取預覽成功:', preview);
+      console.log('Preview fetched successfully:', preview)
       depositPreview.value = preview
     } catch (previewError) {
-      console.error('獲取存款預覽失敗:', previewError)
+      console.error('Failed to get deposit preview:', previewError)
       
-      // 提供更具體的錯誤消息
-      if (previewError.message.includes('請先選擇代幣')) {
-        throw new Error('請返回並選擇代幣')
-      } else if (previewError.message.includes('請輸入代幣金額') || 
-                previewError.message.includes('請為選擇的代幣設置金額')) {
-        throw new Error('請返回並為選擇的代幣設置金額')
+      if (previewError.message.includes('Select tokens first')) {
+        throw new Error('Please select tokens first')
+      } else if (previewError.message.includes('Enter token amount')) {
+        throw new Error('Please enter token amount')
       } else {
         throw previewError
       }
     }
   } catch (err) {
-    console.error('獲取存款預覽失敗:', err)
-    error.value = err.message || '獲取存款預覽失敗'
+    console.error('Failed to get deposit preview:', err)
+    error.value = err.message || 'Failed to get deposit preview'
     mainStore.showNotification(error.value, 'error')
   } finally {
     isLoading.value = false
@@ -407,10 +398,10 @@ async function fetchDepositPreview() {
 }
 
 function retry() {
-  // 清除先前的錯誤
+  // Clear previous error
   error.value = null
   
-  // 重新嘗試獲取預覽
+  // Try again to get preview
   fetchDepositPreview()
 }
 
@@ -420,59 +411,62 @@ function handleImageError(event) {
 
 function handleClose() {
   dialogModel.value = false
-  
-  // 重置狀態
   vaultStore.resetDepositState()
   
-  // 檢查是否需要清理代幣選擇狀態
-  const shouldClearTokens = window.confirm('是否要清除已選擇的代幣?');
+  const shouldClearTokens = window.confirm('Clear selected tokens?')
   if (shouldClearTokens) {
-    // 清空代幣選擇
-    tokenStore.clearSelectedFromTokens();
-    tokenStore.selectedFromToken = null;
-    tokenStore.fromAmount = '';
-    console.log('已清除代幣選擇狀態');
+    tokenStore.clearSelectedFromTokens()
+    tokenStore.selectedFromToken = null
+    tokenStore.fromAmount = ''
+    console.log('Token selection cleared')
   }
 }
 
 async function handleConfirmDeposit() {
-  if (isConfirming.value) return
-  
   try {
-    isConfirming.value = true
+    if (!confirm('Confirm deposit?')) {
+      return
+    }
     
-    // 關閉當前對話框
     dialogModel.value = false
-    
-    // 等待對話框關閉動畫
     await new Promise(resolve => setTimeout(resolve, 300))
     
-    // 顯示交易狀態對話框
-    showTransactionStatus.value = true
+    try {
+      console.log('[Allowance] Emitting show transaction status')
+      emit('showTransactionStatus')
+    } catch (emitError) {
+      console.error('[Allowance] Error emitting transaction status:', emitError)
+    }
     
-    // 發出事件，通知父組件顯示交易狀態
-    emit('showTransactionStatus', true)
+    if (!vaultStore.depositPreview) {
+      throw new Error('No deposit preview data')
+    }
     
-    // 執行存款交易
-    const result = await vaultStore.executeDeposit()
+    let tokens = []
     
-    if (result) {
-      transactionStatus.value = 'success'
-      transactionMessage.value = '存款交易已成功！'
-      transactionHash.value = vaultStore.transactionHash || ''
-      
-      // 更新代幣餘額
-      await tokenStore.fetchTokens()
-    } else {
-      transactionStatus.value = 'error'
-      transactionMessage.value = vaultStore.error || '存款交易失敗'
+    if (multipleTokens.value) {
+      tokens = tokenStore.selectedFromTokens
+        .filter(t => t && t.amount && parseFloat(t.amount) > 0)
+        .map(t => ({
+          address: t.address,
+          amount: t.amount
+        }))
+    } else if (tokenStore.selectedFromToken) {
+      tokens = [{
+        address: tokenStore.selectedFromToken.address,
+        amount: tokenStore.fromAmount
+      }]
+    }
+    
+    console.log('[Allowance] Executing deposit, tokens:', tokens)
+    try {
+      await vaultStore.executeDeposit(tokens)
+    } catch (depositError) {
+      console.error('[Allowance] Error executing deposit:', depositError)
     }
   } catch (error) {
-    console.error('存款失敗:', error)
-    transactionStatus.value = 'error'
-    transactionMessage.value = error.message || '交易處理時發生錯誤'
-  } finally {
-    isConfirming.value = false
+    console.error('[Allowance] Error confirming deposit:', error)
+    mainStore.showNotification('Deposit confirmation failed: ' + (error.message || 'Unknown error'), 'error')
   }
 }
 
@@ -480,7 +474,7 @@ function openFinish() {
   showFinish.value = true
 }
 
-// 格式化數字的輔助函數
+// Helper function to format numbers
 function formatUsdValue(value) {
   const numValue = parseFloat(value) || 0
   return numValue.toLocaleString('en-US', {
@@ -498,7 +492,7 @@ function formatAmount(value) {
 }
 
 onMounted(() => {
-  // 重置狀態
+  // Reset state
   vaultStore.resetDepositState()
 })
 </script>
@@ -645,7 +639,7 @@ onMounted(() => {
   color: #757575;
 }
 
-/* 移動端響應式樣式 */
+/* Mobile responsive styles */
 @media (max-width: 600px) {
   .details-section {
     padding: 12px !important;

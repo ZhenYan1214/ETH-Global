@@ -1,10 +1,10 @@
 <template>
   <div>
-    <!-- 4626list 對話框 -->
+    <!-- Token Selection Dialog -->
     <v-dialog :model-value="modelValue" @update:model-value="$emit('update:modelValue', $event)" max-width="600" scrollable>
       <v-card class="token-dialog">
         <v-toolbar color="primary" density="compact">
-          <v-toolbar-title class="text-white">選擇代幣 (多選)</v-toolbar-title>
+          <v-toolbar-title class="text-white">Select Tokens (Multi)</v-toolbar-title>
           <v-spacer></v-spacer>
           <v-btn 
             v-if="tokenStore.selectedFromTokens.length > 0"
@@ -20,11 +20,11 @@
           </v-btn>
         </v-toolbar>
         
-        <!-- 搜索欄位 -->
+        <!-- Search Field -->
         <div class="pa-3">
           <v-text-field
             v-model="searchText"
-            label="搜尋代幣"
+            label="Search tokens"
             variant="outlined"
             density="compact"
             prepend-inner-icon="mdi-magnify"
@@ -33,20 +33,20 @@
           ></v-text-field>
         </div>
         
-        <!-- 載入中狀態 -->
+        <!-- Loading State -->
         <v-card-text v-if="tokenStore.isLoading" class="text-center pa-4">
           <v-progress-circular indeterminate color="primary"></v-progress-circular>
-          <div class="mt-2">載入中...</div>
+          <div class="mt-2">Loading...</div>
         </v-card-text>
 
-        <!-- 無結果狀態 -->
+        <!-- No Results State -->
         <v-card-text v-else-if="filteredTokens.length === 0" class="text-center pa-4">
           <v-icon size="large" color="grey-lighten-1">mdi-alert-circle-outline</v-icon>
-          <div class="mt-2">您的錢包中沒有代幣</div>
-          <div class="text-caption text-grey mt-1">請連接錢包或添加代幣</div>
+          <div class="mt-2">No tokens found</div>
+          <div class="text-caption text-grey mt-1">Connect wallet or add tokens</div>
         </v-card-text>
 
-        <!-- 代幣列表 -->
+        <!-- Token List -->
         <v-card-text v-else class="token-list-container pa-0">
           <v-list class="token-list py-0">
             <v-list-item
@@ -88,18 +88,18 @@
           </v-list>
         </v-card-text>
 
-        <!-- 底部區域 -->
+        <!-- Footer Area -->
         <div class="token-dialog-footer">
-          <!-- 總資產價值 -->
+          <!-- Total Value -->
           <v-divider></v-divider>
           <div class="total-value-container px-4 py-3">
             <div class="d-flex justify-space-between align-center">
-              <span class="text-subtitle-1">總價值:</span>
+              <span class="text-subtitle-1">Total Value:</span>
               <span class="text-h6 font-weight-bold text-primary">${{ getTotalValue }}</span>
             </div>
           </div>
 
-          <!-- 金庫按鈕 -->
+          <!-- Vault Button -->
           <div class="vault-button-container px-4 pb-4">
             <v-btn
               class="vault-button"
@@ -110,50 +110,49 @@
               :class="{'vault-button-disabled': !hasSelectedTokens}"
               @click="goToVault"
             >
-              <span class="vault-button-text">✨ 金庫我來了 ✨</span>
+              <span class="vault-button-text">✨ Enter Vault ✨</span>
             </v-btn>
             
-            <!-- 添加提示信息 -->
+            <!-- Hint Messages -->
             <div v-if="!hasSelectedTokens" class="selection-hint mt-2 text-center">
               <v-icon color="warning" size="small" class="mr-1">mdi-information</v-icon>
-              <span class="text-caption">請先選擇至少一個代幣</span>
+              <span class="text-caption">Select at least one token</span>
             </div>
             <div v-else-if="hasInvalidAmounts" class="selection-hint mt-2 text-center">
               <v-icon color="warning" size="small" class="mr-1">mdi-cash-alert</v-icon>
-              <span class="text-caption">有代幣金額為0，請確認金額</span>
+              <span class="text-caption">Some tokens have zero amount</span>
             </div>
           </div>
         </div>
       </v-card>
     </v-dialog>
 
-    <!-- Allowance 對話框 -->
+    <!-- Additional Dialogs -->
     <Allowance 
       v-model="showAllowanceDialog"
       @showTransactionStatus="handleShowTransactionStatus"
     />
 
-    <!-- TransactionStatus 對話框 -->
-    <v-dialog 
-      v-model="showTransactionStatus" 
-      max-width="400"
-      :persistent="transactionStatus === 'pending'"
-      @click:outside="handleTransactionDialogClose"
-    >
-      <TransactionStatus
-        :status="transactionStatus"
-        :error-message="errorMessage"
-        @retry="handleRetry"
-        @close="handleTransactionClose"
-      />
-    </v-dialog>
+    <TransactionStatus
+      v-model:visible="showTransactionStatusDialog"
+      :status="transactionStatus"
+      :message="transactionMessage"
+      :hash="transactionHash"
+      :receipt="transactionReceipt"
+      @done="handleTransactionDone"
+    />
 
-    <Finish v-if="showFinish" @close="showFinish = false" />
+    <Finish 
+      v-model:show="showFinishDialog" 
+      :to-amount="receivedAmount"
+      :transaction-hash="transactionHash"
+      :receipt="transactionReceipt"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue'
+import { ref, computed, onMounted, watch, onUnmounted } from 'vue'
 import { useTokenStore } from '../store/tokens'
 import { useWalletStore } from '../store/wallet'
 import { useRouter } from 'vue-router'
@@ -177,29 +176,34 @@ const tokenStore = useTokenStore()
 const walletStore = useWalletStore()
 const searchText = ref('')
 const showAllowanceDialog = ref(false)
-const showTransactionStatus = ref(false)
-const showFinish = ref(false)
+const showTransactionStatusDialog = ref(false)
+const showFinishDialog = ref(false)
 const transactionStatus = ref('pending')
-const transactionMessage = ref('處理存款中...')
+const transactionMessage = ref('Transaction processing, please wait...')
 const transactionHash = ref('')
+const transactionReceipt = ref(null)
+const receivedAmount = ref('0')
 const errorMessage = ref('')
 const vaultStore = useVaultStore()
 
-// 監聽對話框顯示狀態
+// Store subscriptions
+let vaultStoreSubscription = null
+
+// Watch dialog display status
 watch(() => props.modelValue, async (newValue) => {
   if (newValue && walletStore.isConnected) {
-    // 當對話框打開時，重新獲取用戶錢包中的代幣
+    // Fetch user's wallet tokens when dialog opens
     await tokenStore.fetchTokens()
   }
 })
 
-// 過濾代幣列表 - 只顯示有餘額的代幣
+// Filter token list - only show tokens with balance
 const filteredTokens = computed(() => {
   if (!tokenStore.tokens) return []
   
   const search = searchText.value.toLowerCase()
   return tokenStore.tokens.filter(token => {
-    // 確保代幣有餘額且不為0
+    // Ensure token has non-zero balance
     if (!token.balance || token.balance === '0' || parseFloat(token.balance) === 0) return false
     
     const symbol = getTokenSymbol(token.address).toLowerCase()
@@ -212,7 +216,7 @@ const filteredTokens = computed(() => {
   })
 })
 
-// 計算總資產價值
+// Calculate total asset value
 const getTotalValue = computed(() => {
   if (!tokenStore.tokens) return '0.00'
   
@@ -228,12 +232,12 @@ const getTotalValue = computed(() => {
   })
 })
 
-// 檢查是否有選擇代幣
+// Check if tokens are selected
 const hasSelectedTokens = computed(() => {
   return tokenStore.selectedFromTokens && tokenStore.selectedFromTokens.length > 0;
 });
 
-// 檢查選擇的代幣中是否有無效金額
+// Check for invalid amounts in selected tokens
 const hasInvalidAmounts = computed(() => {
   if (!hasSelectedTokens.value) return false;
   
@@ -408,53 +412,149 @@ function goToVault() {
   }
 }
 
-async function handleShowTransactionStatus(show) {
-  showTransactionStatus.value = show;
-  const vaultStore = useVaultStore();
-  
-  // 如果 Allowance 組件發送了顯示狀態，但我們需要顯示自己的狀態對話框
-  if (show) {
-    // 關閉 Allowance 對話框
-    showAllowanceDialog.value = false;
+// 處理交易狀態顯示
+function handleShowTransactionStatus() {
+  try {
+    console.log('[4626list] 顯示交易狀態')
+    showTransactionStatusDialog.value = true
+    transactionStatus.value = 'pending'
+    transactionMessage.value = 'Transaction processing, please wait...'
+    transactionHash.value = ''
+    transactionReceipt.value = null
     
-    // 等待對話框關閉動畫
-    await new Promise(resolve => setTimeout(resolve, 300));
+    // 先取消現有訂閱，避免重複
+    if (vaultStoreSubscription) {
+      try {
+        vaultStoreSubscription()
+        console.log('[4626list] 已取消舊的 vaultStore 訂閱')
+      } catch (error) {
+        console.error('[4626list] 取消舊訂閱時發生錯誤:', error)
+      }
+      vaultStoreSubscription = null
+    }
     
-    // 顯示交易狀態對話框
-    showTransactionStatus.value = true;
-    
-    // 設置初始狀態
-    transactionStatus.value = vaultStore.depositStatus || 'pending';
-    transactionMessage.value = "處理存款中...";
-    transactionHash.value = vaultStore.transactionHash;
-  }
-  
-  // 監聽存款狀態的變化
-  if (vaultStore.depositStatus === 'success') {
-    transactionStatus.value = 'success';
-    transactionMessage.value = '存款交易已成功！';
-    transactionHash.value = vaultStore.transactionHash || '';
-  } else if (vaultStore.depositStatus === 'error') {
-    transactionStatus.value = 'error';
-    transactionMessage.value = vaultStore.error || '存款交易失敗';
+    // 創建新的訂閱
+    console.log('[4626list] 創建新的 vaultStore 訂閱')
+    try {
+      vaultStoreSubscription = vaultStore.$subscribe((mutation, state) => {
+        try {
+          console.log('[4626list] Vault store 狀態變化:', {
+            depositStatus: state.depositStatus,
+            transactionHash: state.transactionHash,
+            hasReceipt: state.depositReceipt ? '有' : '無',
+            error: state.error
+          })
+          
+          // 檢查狀態變化並更新 TransactionStatus 組件的顯示
+          if (state.depositStatus === 'processing' && state.transactionHash) {
+            console.log('[4626list] 交易處理中...')
+            transactionStatus.value = 'pending'
+            transactionMessage.value = 'Transaction submitted, waiting for confirmation...'
+            transactionHash.value = state.transactionHash
+          } 
+          else if (state.depositStatus === 'success') {
+            console.log('[4626list] 交易成功!')
+            transactionStatus.value = 'success'
+            transactionMessage.value = 'Transaction confirmed!'
+            
+            // 只有在收到收據後才設置 receipt
+            if (state.depositReceipt) {
+              console.log('[4626list] 收到交易收據:', state.depositReceipt)
+              try {
+                // 明確轉換為新物件，確保觸發 Vue 的響應式
+                const receiptCopy = JSON.parse(JSON.stringify(state.depositReceipt))
+                transactionReceipt.value = receiptCopy
+                
+                // 設置接收到的金額，用於完成頁面顯示
+                if (state.depositPreview && state.depositPreview.dstAmount) {
+                  receivedAmount.value = formatDisplayAmount(state.depositPreview.dstAmount)
+                  console.log('[4626list] 設置接收金額:', receivedAmount.value)
+                }
+              } catch (receiptError) {
+                console.error('[4626list] 處理交易收據時發生錯誤:', receiptError)
+              }
+            } else {
+              console.warn('[4626list] 交易成功但未收到收據')
+            }
+          } 
+          else if (state.depositStatus === 'error') {
+            console.log('[4626list] 交易失敗:', state.error)
+            transactionStatus.value = 'error'
+            transactionMessage.value = `Transaction failed: ${state.error || 'Unknown error'}`
+          }
+        } catch (subscribeError) {
+          console.error('[4626list] 訂閱回調中發生錯誤:', subscribeError)
+        }
+      })
+    } catch (subscriptionError) {
+      console.error('[4626list] 創建訂閱時發生錯誤:', subscriptionError)
+    }
+  } catch (error) {
+    console.error('[4626list] 顯示交易狀態時發生錯誤:', error)
   }
 }
 
-function handleTransactionDialogClose() {
-  if (transactionStatus.value !== 'pending') {
-    showTransactionStatus.value = false
+// 處理交易完成後的行為
+function handleTransactionDone() {
+  try {
+    console.log('[4626list] 交易過程完成，狀態:', transactionStatus.value)
+    
+    // 取消 vaultStore 訂閱
+    if (vaultStoreSubscription) {
+      try {
+        vaultStoreSubscription()
+        vaultStoreSubscription = null
+        console.log('[4626list] 已取消 vaultStore 訂閱')
+      } catch (error) {
+        console.error('[4626list] 取消訂閱時發生錯誤:', error)
+      }
+    }
+    
+    // 檢查交易狀態
+    if (transactionStatus.value === 'success') {
+      console.log('[4626list] 顯示完成頁面')
+      
+      // 確保關閉交易狀態對話框後再顯示完成頁面
+      setTimeout(() => {
+        try {
+          showFinishDialog.value = true
+          console.log('[4626list] 完成頁面已顯示')
+        } catch (error) {
+          console.error('[4626list] 顯示完成頁面時發生錯誤:', error)
+        }
+      }, 300)
+    }
+    
+    // 重置交易相關狀態
+    transactionStatus.value = 'pending'
+    transactionMessage.value = 'Transaction processing, please wait...'
+    transactionHash.value = ''
+    transactionReceipt.value = null
+    
+    // 重置 vaultStore
+    try {
+      console.log('[4626list] 重置 vaultStore')
+      vaultStore.$reset()
+    } catch (error) {
+      console.error('[4626list] 重置 vaultStore 時發生錯誤:', error)
+    }
+  } catch (error) {
+    console.error('[4626list] 處理交易完成事件時發生錯誤:', error)
   }
 }
 
-function handleTransactionClose() {
-  showTransactionStatus.value = false
-  
-  // 如果交易成功，清空選擇的代幣並更新代幣列表
-  if (transactionStatus.value === 'success') {
-    tokenStore.clearSelectedFromTokens()
-    tokenStore.fetchTokens()
+// 在組件卸載時確保清理訂閱
+onUnmounted(() => {
+  if (vaultStoreSubscription) {
+    try {
+      vaultStoreSubscription()
+      vaultStoreSubscription = null
+      console.log('[4626list] 組件卸載時已取消 vaultStore 訂閱')
+    } catch (error) {
+      console.error('[4626list] 組件卸載時取消訂閱發生錯誤:', error)
+    }
   }
-}
+})
 
 async function handleRetry() {
   transactionStatus.value = 'pending'
@@ -462,7 +562,7 @@ async function handleRetry() {
   
   try {
     // 尝试重新关闭窗口并从 Allowance 开始
-    showTransactionStatus.value = false
+    showTransactionStatusDialog.value = false
     await new Promise(resolve => setTimeout(resolve, 300))
     
     // 重新打开 Allowance 弹窗
@@ -473,8 +573,21 @@ async function handleRetry() {
   }
 }
 
-const openFinish = () => {
-  showFinish.value = true
+// 格式化金額顯示
+function formatDisplayAmount(amount, decimals = 6) {
+  if (!amount) return '0';
+  
+  // 確保金額是字符串
+  const amountStr = amount.toString();
+  
+  // 轉換為數字
+  const value = parseFloat(amountStr) / Math.pow(10, decimals);
+  
+  // 格式化顯示，保留2位小數
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  });
 }
 
 // 組件掛載時，如果錢包已連接則獲取代幣列表
