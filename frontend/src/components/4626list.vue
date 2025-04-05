@@ -4,7 +4,7 @@
     <v-dialog :model-value="modelValue" @update:model-value="$emit('update:modelValue', $event)" max-width="600" scrollable>
       <v-card class="token-dialog">
         <v-toolbar color="primary" density="compact">
-          <v-toolbar-title class="text-white">Select Token (Multi-Select)</v-toolbar-title>
+          <v-toolbar-title class="text-white">選擇代幣 (多選)</v-toolbar-title>
           <v-spacer></v-spacer>
           <v-btn 
             v-if="tokenStore.selectedFromTokens.length > 0"
@@ -24,7 +24,7 @@
         <div class="pa-3">
           <v-text-field
             v-model="searchText"
-            label="Search Token"
+            label="搜尋代幣"
             variant="outlined"
             density="compact"
             prepend-inner-icon="mdi-magnify"
@@ -36,13 +36,14 @@
         <!-- 載入中狀態 -->
         <v-card-text v-if="tokenStore.isLoading" class="text-center pa-4">
           <v-progress-circular indeterminate color="primary"></v-progress-circular>
-          <div class="mt-2">Loading...</div>
+          <div class="mt-2">載入中...</div>
         </v-card-text>
 
         <!-- 無結果狀態 -->
         <v-card-text v-else-if="filteredTokens.length === 0" class="text-center pa-4">
           <v-icon size="large" color="grey-lighten-1">mdi-alert-circle-outline</v-icon>
-          <div class="mt-2">No matching tokens</div>
+          <div class="mt-2">您的錢包中沒有代幣</div>
+          <div class="text-caption text-grey mt-1">請連接錢包或添加代幣</div>
         </v-card-text>
 
         <!-- 代幣列表 -->
@@ -91,7 +92,7 @@
         <v-divider></v-divider>
         <v-card-text class="pa-4">
           <div class="d-flex justify-space-between align-center">
-            <span class="text-subtitle-1">Total Value:</span>
+            <span class="text-subtitle-1">總價值:</span>
             <span class="text-h6 font-weight-bold text-primary">${{ getTotalValue }}</span>
           </div>
         </v-card-text>
@@ -103,6 +104,8 @@
             elevation="0"
             rounded
             block
+            :disabled="!hasSelectedTokens"
+            :class="{'vault-button-disabled': !hasSelectedTokens}"
             @click="goToVault"
           >
             <span class="vault-button-text">✨ 金庫我來了 ✨</span>
@@ -144,6 +147,7 @@ import { useRouter } from 'vue-router'
 import Allowance from './Allowance.vue'
 import TransactionStatus from './TransactionStatus.vue'
 import Finish from './Finish.vue'
+import { useMainStore } from '../store/main'
 
 const props = defineProps({
   modelValue: {
@@ -167,16 +171,20 @@ const errorMessage = ref('')
 // 監聽對話框顯示狀態
 watch(() => props.modelValue, async (newValue) => {
   if (newValue && walletStore.isConnected) {
+    // 當對話框打開時，重新獲取用戶錢包中的代幣
     await tokenStore.fetchTokens()
   }
 })
 
-// 過濾代幣列表
+// 過濾代幣列表 - 只顯示有餘額的代幣
 const filteredTokens = computed(() => {
   if (!tokenStore.tokens) return []
   
   const search = searchText.value.toLowerCase()
   return tokenStore.tokens.filter(token => {
+    // 確保代幣有餘額且不為0
+    if (!token.balance || token.balance === '0' || parseFloat(token.balance) === 0) return false
+    
     const symbol = getTokenSymbol(token.address).toLowerCase()
     const name = getTokenName(token.address).toLowerCase()
     const address = token.address.toLowerCase()
@@ -202,6 +210,11 @@ const getTotalValue = computed(() => {
     maximumFractionDigits: 2
   })
 })
+
+// 檢查是否有選擇代幣
+const hasSelectedTokens = computed(() => {
+  return tokenStore.selectedFromTokens && tokenStore.selectedFromTokens.length > 0;
+});
 
 function getTokenLogo(address) {
   if (!address) return 'https://via.placeholder.com/40'
@@ -269,9 +282,20 @@ function selectTokenWithFullAmount(address) {
     // If already selected, deselect it
     tokenStore.toggleFromToken(address)
   }
+  
+  // 檢查選擇狀態並更新按鈕狀態
+  console.log('Selected tokens:', tokenStore.selectedFromTokens.length)
 }
 
 function goToVault() {
+  // 檢查是否有選擇代幣
+  if (!hasSelectedTokens.value) {
+    // 如果沒有選擇代幣，顯示提示訊息
+    const mainStore = useMainStore()
+    mainStore.showNotification('請至少選擇一個代幣', 'warning')
+    return
+  }
+  
   emit('update:modelValue', false)  // 先關閉 4626list 對話框
   setTimeout(() => {
     showAllowanceDialog.value = true  // 然後顯示 Allowance 對話框
@@ -324,6 +348,7 @@ const openFinish = () => {
 // 組件掛載時，如果錢包已連接則獲取代幣列表
 onMounted(async () => {
   if (walletStore.isConnected) {
+    // 確保只獲取用戶錢包中的代幣
     await tokenStore.fetchTokens()
   }
 })
@@ -451,6 +476,21 @@ onMounted(async () => {
   letter-spacing: 1px;
   text-transform: none !important;
   transition: all 0.3s ease !important;
+}
+
+.vault-button-disabled {
+  background: #e0e0e0 !important;
+  cursor: not-allowed !important;
+  opacity: 0.7;
+}
+
+.vault-button-disabled::before {
+  display: none;
+}
+
+.vault-button-disabled:hover {
+  transform: none !important;
+  box-shadow: none !important;
 }
 
 .vault-button::before {
