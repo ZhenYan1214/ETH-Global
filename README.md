@@ -67,5 +67,5 @@ ETH-Global/
   - IG: @re_aprhp_027
 
 ## 🔗 Links
-- Demo Video:
+- ETH Global: https://ethglobal.com/showcase/piggybank-3x9be
 - PPT slides: https://www.canva.com/design/DAGjrS__wLU/gqIsMfo2JREjO1A9KJ7rTQ/edit
